@@ -1,0 +1,62 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Completed Tasks {% endblock %} 
+{% block page_title %} Completed Tasks {% endblock %}
+
+<!-- Specific Page CSS goes HERE  -->
+{% block stylesheets %}{% endblock stylesheets %}
+
+{% block content %}
+    <div class="container-fluid py-4">
+      <div id="completed_task">
+      </div>
+
+      {% include 'includes/footer.html' %}
+    </div>
+
+{% endblock content %}
+
+<!-- Specific Page JS goes HERE  -->
+
+{% block javascripts %}
+<script>
+  function updateCompletedTask(visData) {
+    const container = document.getElementById('completed_task');
+    let currentHtml = '';
+    let terminatedStatus;
+    
+
+    for (let idx = 0; idx < visData.runner_visualization.task_status.completed_tasks.length; idx++) {
+      if (visData.runner_visualization.task_status.completed_tasks[idx].terminated) {
+        terminatedStatus = '<span class="badge badge-sm bg-gradient-danger">Terminated</span>'
+      }
+      else {
+        terminatedStatus = '<span class="badge badge-sm bg-gradient-success">Completed</span>'
+      }
+      currentHtml += `<div class="row">
+          <div class="card mb-4">
+            <div class="card-header pb-0">
+              <h4>${visData.runner_visualization.task_status.completed_tasks[idx].task_id}</h4>
+            </div>
+            <div class="card-body">
+              <ul class="list-group">
+                <li class="list-group-item border-0 ps-0 pt-0 text-sm"><strong class="text-dark">Status :</strong> &nbsp; ${terminatedStatus} </li>
+                <li class="list-group-item border-0 ps-0 pt-0 text-sm"><strong class="text-dark">Start Time :</strong> &nbsp; ${visData.runner_visualization.task_status.completed_tasks[idx].start_time_readable} </li>
+                <li class="list-group-item border-0 ps-0 pt-0 text-sm"><strong class="text-dark">Time Taken :</strong> &nbsp; ${visData.runner_visualization.task_status.completed_tasks[idx].total_time}  </li>
+                <li class="list-group-item border-0 ps-0 pt-0 text-sm"><strong class="text-dark">GPU IDs :</strong> &nbsp; ${visData.runner_visualization.task_status.completed_tasks[idx].gpu_ids} </li>
+                <li class="list-group-item border-0 ps-0 pt-0 text-sm"><strong class="text-dark">Command :</strong> &nbsp; ${visData.runner_visualization.task_status.completed_tasks[idx].command} </li>
+              </ul>
+            </div>
+          </div>
+        </div>`
+    }
+    container.innerHTML = currentHtml
+  }
+  
+  socket.on('update_vis_data', function(visData_local) {
+        console.log('Received new data!');
+        updateCompletedTask(visData_local);
+        
+  });
+</script>
+{% endblock javascripts %}

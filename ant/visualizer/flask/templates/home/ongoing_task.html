@@ -1,0 +1,93 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Ongoing Tasks {% endblock %} 
+{% block page_title %} Ongoing Tasks {% endblock %}
+
+<!-- Specific Page CSS goes HERE  -->
+{% block stylesheets %}{% endblock stylesheets %}
+
+{% block content %}
+
+<style>
+  .terminal-window {
+          background-color: #000;
+          border-radius: 5px;
+          box-shadow: 0 0 8px rgba(0,0,0,0.3);
+          margin-left: 40px;
+          margin-right: 40px;
+          margin-top: 10px;
+          margin-bottom: 10px;
+          height: 50vh;
+          max-height: 250px;
+          display: flex;
+          flex-direction: column;
+
+      }
+      .terminal-button {
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          margin-left: 6px;
+      }
+      .terminal-content {
+          color: #fff;
+          font-family: 'Courier New', Courier, monospace;
+          font-size: 14px;
+          line-height: 1.5;
+          white-space: pre-wrap;
+          padding: 10px;
+          overflow-y: auto;
+          max-height: 400px;
+      }
+</style>
+
+    <div class="container-fluid py-4">
+      <div id="ongoing_task">
+      </div>
+
+      {% include 'includes/footer.html' %}
+    </div>
+
+{% endblock content %}
+
+<!-- Specific Page JS goes HERE  -->
+
+{% block javascripts %}
+<script>
+  function updateOngoingTask(visData) {
+    const container = document.getElementById('ongoing_task');
+    let currentHtml = '';
+
+    for (let idx = 0; idx < visData.runner_visualization.task_status.running_tasks.length; idx++) {
+      currentHtml += `<div class="row">
+          <div class="card mb-4">
+            <div class="card-header pb-0">
+              <h4>${visData.runner_visualization.task_status.running_tasks[idx].task_id}</h4>
+            </div>
+            <div class="card-body">
+              <ul class="list-group">
+                <li class="list-group-item border-0 ps-0 pt-0 text-sm"><strong class="text-dark">Status :</strong> &nbsp; <span class="badge badge-sm bg-gradient-success">RUNNING</span>  </li>
+                <li class="list-group-item border-0 ps-0 pt-0 text-sm"><strong class="text-dark">GPU IDs :</strong> &nbsp; ${visData.runner_visualization.task_status.running_tasks[idx].gpu_ids} </li>
+                <li class="list-group-item border-0 ps-0 pt-0 text-sm"><strong class="text-dark">Command :</strong> &nbsp; ${visData.runner_visualization.task_status.running_tasks[idx].command} </li>
+                <div class="terminal-window">
+                  <div class="terminal-content">${visData.runner_visualization.task_status.terminal_logs[idx].join("\n")}</div>
+                </div>
+                <form action="/terminate_task" method="post" style="margin-top: 10px; text-align: right;">
+                  <input type="hidden" name="task_id" value="${visData.runner_visualization.task_status.running_tasks[idx].task_id}">
+                  <button type="submit" class="btn btn-danger">Terminate</button>
+              </form>
+              </ul>
+            </div>
+          </div>
+        </div>`;
+    };
+  container.innerHTML = currentHtml;
+  };
+
+  socket.on('update_vis_data', function(visData_local) {
+        console.log('Received new data!');
+        updateOngoingTask(visData_local);
+  });
+  
+</script>
+{% endblock javascripts %}

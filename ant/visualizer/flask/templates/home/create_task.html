@@ -1,0 +1,114 @@
+{% extends "layouts/base.html" %}
+
+{% block title %} Create New Task {% endblock %} 
+{% block page_title %} Create New Task {% endblock %}
+
+<!-- Specific Page CSS goes HERE  -->
+{% block stylesheets %}{% endblock stylesheets %}
+
+{% block content %}
+
+    <div class="container-fluid py-4">
+      <div class="row">
+        <div class="card mb-4">
+          <div class="card-body">
+            <form role="form" class="text-start" action="{{ url_for('create_task') }}" method="POST">
+              <div class="input-group input-group-outline my-3 is-filled">
+                <label class="form-label">Task ID</label>
+                <input id="task_id" name="task_id" class="form-control" value="{{ new_task_id }}" required>
+              </div>
+            
+              <div class="input-group input-group-outline my-3 is-filled">
+                <label class="form-label">Number of GPUs</label>
+                <select id="n_gpus" name="n_gpus" class="form-control" style="font-family: 'Courier New', Courier, monospace;" required>
+                </select>
+              </div>
+    
+              <div class="input-group input-group-outline mb-3">
+                <label class="form-label">Commands</label>
+                <textarea id="command" name="command" class="form-control" rows="5" style="font-family: 'Courier New', Courier, monospace;" required></textarea>
+              </div>
+    
+              <div class="text-center">
+                <button type="submit" class="btn bg-gradient-primary w-100 my-4 mb-2">Submit</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header pb-0">
+            <h4>Queued Tasks</h4>
+          </div>
+          <div class="card-body">
+            <ul class="list-group" id="queued_tasks">
+              
+            </ul>
+          </div>
+        </div>
+      </div>
+
+
+      <div class="position-fixed bottom-1 end-1 z-index-2">
+        <div class="toast fade hide p-2 bg-white" role="alert" aria-live="assertive" id="successToast" aria-atomic="true">
+          <div class="toast-header border-0">
+            <i class="material-icons text-success me-2">check</i>
+            <span class="me-auto font-weight-bold">Material Dashboard </span>
+            <small class="text-body">11 mins ago</small>
+            <i class="fas fa-times text-md ms-3 cursor-pointer" data-bs-dismiss="toast" aria-label="Close"></i>
+          </div>
+          <hr class="horizontal dark m-0">
+          <div class="toast-body">
+            Hello, world! This is a notification message.
+          </div>
+        </div>
+      </div>
+
+      {% include 'includes/footer.html' %}
+    </div>
+
+{% endblock content %}
+
+<!-- Specific Page JS goes HERE  -->
+
+{% block javascripts %}
+<script>
+  // create form with proper gpu selector
+  const container = document.getElementById('n_gpus');
+  let selectHtml = '';
+  for (let i = 0; i < visData.runner_visualization.status.gpu_name.length; i++) {
+    selectHtml += `<option value="${i + 1}">${i + 1}</option>`;
+  }
+  container.innerHTML = selectHtml;
+
+  function updateQueuedTask(visData) {
+    const container = document.getElementById('queued_tasks');
+    let currentHtml = '';
+
+    for (let idx = 0; idx < visData.runner_visualization.task_status.queued_tasks.length; idx++) {
+      currentHtml += `<li class="list-group-item border-0 d-flex p-4 mb-2 bg-gray-100 border-radius-lg">
+                    <div class="d-flex flex-column">
+                      <h6 class="mb-3 text-sm">${visData.runner_visualization.task_status.queued_tasks[idx].ant_task_id}</h6>
+                      <span class="mb-2 text-xs"><i>n</i> GPUs: <span class="text-dark font-weight-bold ms-sm-2">${visData.runner_visualization.task_status.queued_tasks[idx].ant_n_gpus}</span></span>
+                      <span class="mb-2 text-xs">Commands: <span class="text-dark ms-sm-2 font-weight-bold">${visData.runner_visualization.task_status.queued_tasks[idx].command}</span></span>
+                      <span class="text-xs">Envar: <span class="text-dark ms-sm-2 font-weight-bold">None</span></span>
+                    </div>
+                    <div class="ms-auto text-end">
+                      <form action="{{ url_for('delete_queued_task') }}" method="post" style="text-align: right;">
+                          <input type="hidden" name="task_id" value="${visData.runner_visualization.task_status.queued_tasks[idx].ant_task_id}">
+                          <button type="submit" class="btn btn-danger">Delete</button>
+                      </form>
+                    </div>
+                   </li>`
+    }
+    container.innerHTML = currentHtml;
+  }
+  socket.on('update_vis_data', function(visData_local) {
+      console.log(visData_local.runner_visualization.task_status.queued_tasks.length)
+        console.log('Received new data!');
+        updateQueuedTask(visData_local)
+  });
+
+  
+</script>
+{% endblock javascripts %}
