@@ -1,4 +1,3 @@
 ant_runner/
 *.ipynb
-*.txt
 __pycache__
