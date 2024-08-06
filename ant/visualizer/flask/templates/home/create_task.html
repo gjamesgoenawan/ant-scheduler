@@ -73,13 +73,16 @@
 
 {% block javascripts %}
 <script>
-  // create form with proper gpu selector
-  const container = document.getElementById('n_gpus');
-  let selectHtml = '';
-  for (let i = 0; i < visData.runner_visualization.status.gpu_name.length; i++) {
-    selectHtml += `<option value="${i + 1}">${i + 1}</option>`;
+  
+  function updateGPUOptions(visData) {
+    // create form with proper gpu selector
+    const container = document.getElementById('n_gpus');
+    let selectHtml = '';
+    for (let i = 0; i < visData.runner_visualization.status.gpu_name.length; i++) {
+      selectHtml += `<option value="${i + 1}">${i + 1}</option>`;
+    }
+    container.innerHTML = selectHtml;
   }
-  container.innerHTML = selectHtml;
 
   function updateQueuedTask(visData) {
     const container = document.getElementById('queued_tasks');
@@ -103,10 +106,16 @@
     }
     container.innerHTML = currentHtml;
   }
+  
+  let optionDrawn = false;
   socket.on('update_vis_data', function(visData_local) {
-      console.log(visData_local.runner_visualization.task_status.queued_tasks.length)
-        console.log('Received new data!');
-        updateQueuedTask(visData_local)
+      console.log('Received new data!');
+      updateQueuedTask(visData_local)
+
+      if (optionDrawn == false) {
+        updateGPUOptions(visData_local)
+        optionDrawn = true
+      }
   });
 
   
