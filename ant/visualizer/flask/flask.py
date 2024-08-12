@@ -19,18 +19,17 @@ Minify(app=app, html=True, js=True, cssless=True)
 data_lock = threading.Lock()
 
 # Shared data structure
-vis_data = {'runner_visualization' : {'status' : {'gpu_name' : ['rtx_5000']  * 4,
-                                                  'gpu_usage' : [[i for i in range(0,300)] * 4],
-                                                  'gpu_memory' : [[i for i in range(0,300)] * 4],
-                                                  'gpu_power_draw' : [[i for i in range(0,300)] * 4]},
-                                      'task_status' : {'running_tasks' : [],
-                                                       'completed_tasks' : [],
-                                                       'queued_tasks' : [],
-                                                       'terminal_logs' : []}}}
+vis_data = {'runner_visualization' : {'status' : {'gpu_name' : [str]  * 4,
+                                                  'gpu_usage' : [[float] * 4],
+                                                  'gpu_memory' : [[float] * 4],
+                                                  'gpu_power_draw' : [[float] * 4]},
+                                      'task_status' : {'running_tasks' : [dict],
+                                                       'completed_tasks' : [dict],
+                                                       'queued_tasks' : [dict],
+                                                       'terminal_logs' : [dict]}}}
 
 def find_task_by_task_id(dictionary, x, key='task_id'):
     global vis_data
-
     for i in dictionary:
         if i[key] == x:
             return i
@@ -38,7 +37,7 @@ def find_task_by_task_id(dictionary, x, key='task_id'):
 
 @app.route('/')
 def stats():
-    return render_template('home/stats.html')
+    return render_template('home/stats.html', segment='dashboard')
 
 @socketio.on('connect')
 def handle_connect():
@@ -46,7 +45,6 @@ def handle_connect():
 
 def emit_vis_data():
     global vis_data
-    #print(running_tasks, completed_tasks, terminal_logs)
     socketio.emit('update_vis_data', vis_data)
 
 def background_task():
@@ -57,12 +55,12 @@ def background_task():
 @app.route('/ongoing_task')
 def ongoing_task():
         global vis_data
-        return render_template('home/ongoing_task.html')
+        return render_template('home/ongoing_task.html', segment='ongoing')
         
 @app.route('/completed_task')
 def completed_task():
         global vis_data
-        return render_template('home/completed_task.html')
+        return render_template('home/completed_task.html', segment='completed')
 
 @app.route('/create_task', methods=['GET', 'POST'])
 def create_task():
@@ -78,7 +76,7 @@ def create_task():
 
         return redirect(url_for('create_task'))
     new_task_id = str(uuid.uuid4())
-    return render_template('home/create_task.html', new_task_id=new_task_id)
+    return render_template('home/create_task.html', new_task_id=new_task_id, segment='create_task')
 
 @app.route('/delete_queued_task', methods=['POST'])
 def delete_queued_task():
@@ -90,10 +88,8 @@ def delete_queued_task():
 @app.route('/terminate_task', methods=['POST'])
 def terminate_task():
     global vis_data
-
     runner_instruction = {'task_to_terminate' : find_task_by_task_id(vis_data['runner_visualization']['task_status']['running_tasks'], request.form['task_id'], key='task_id')}
     vis_data = g.runner.step(runner_instruction)
-
     return redirect(url_for('ongoing_task'))
 
 def run_flask_app(host='0.0.0.0', port=5000):
@@ -140,9 +136,9 @@ class flask_visualizer(base_visualizer):
 
     def step(self, visualizer_response):
         global vis_data
-        visualizer_response.update({"update_gpu_stats" : True})
+        visualizer_response.update({"update_system_stats" : True})
         vis_data = self.runner.step(visualizer_response = visualizer_response, vis_prop = self.get_vis_prop())
-    
+
     def run(self):
         try:
             while True:

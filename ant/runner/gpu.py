@@ -7,6 +7,7 @@ import subprocess
 from typing import List, Dict, Any, Optional
 
 from ant.utils.misc import list2str, parse_envar, INF, read_last_n_lines, wrap_text, format_timedelta
+from ant.utils.sysinfo import get_system_info
 from ant.runner import base_runner
 from ant.loader import base_loader
 from ant.logger import base_logger
@@ -15,54 +16,6 @@ from ant.handler import base_handler
 def get_gpu_names():
     gpu_names = [i.strip() for i in subprocess.check_output("nvidia-smi -L", shell=True).decode().split("\n") if len(i) > 0]
     return gpu_names
-
-def get_gpu_info(gpu_ids=[], full=False):
-    try:
-
-        if full:
-            result = subprocess.run([
-                'nvidia-smi', 
-                '--query-gpu=uuid,name,utilization.gpu,memory.used,memory.total,power.draw,', 
-                '--format=csv,noheader,nounits'
-            ], capture_output=True, text=True, check=True)
-            
-            gpu_data = []
-            lines = result.stdout.strip().split('\n')
-
-            for idx in gpu_ids:
-                uuid, name, utilization, memory_used, memory_total, power_draw, = lines[idx].split(', ')
-                gpu_info = {
-                    'gpu_uuid': uuid,
-                    'gpu_name': name,
-                    'gpu_usage': float(utilization),
-                    'gpu_memory': int(memory_used) / 1024,
-                    'gpu_total_memory': int(memory_total) / 1024,
-                    'gpu_power_draw': float(power_draw),
-                }
-                gpu_data.append(gpu_info)
-            return gpu_data
-        else:
-            result = subprocess.run([
-                'nvidia-smi', 
-                '--query-gpu=utilization.gpu,memory.used,power.draw,', 
-                '--format=csv,noheader,nounits'
-            ], capture_output=True, text=True, check=True)
-            
-            gpu_data = []
-            lines = result.stdout.strip().split('\n')
-
-            for idx in gpu_ids:
-                utilization, memory_used, power_draw, = lines[idx].split(', ')
-                gpu_info = {
-                    'gpu_usage': float(utilization),
-                    'gpu_memory': int(memory_used) / 1024,
-                    'gpu_power_draw': float(power_draw),
-                }
-                gpu_data.append(gpu_info)
-            return gpu_data
-    except subprocess.CalledProcessError as e:
-        print(f"Error running nvidia-smi: {e}")
-        return []
 
 class gpu_runner(base_runner):
     def __init__(self, 
@@ -84,14 +37,21 @@ class gpu_runner(base_runner):
         self.logger, self.original_logger = self.setup_logger(logger, return_original_logger = True)
 
         # get initial gpu stats
-        current_gpu_stats = get_gpu_info(gpu_ids = self.gpu_ids, full=True)
-        self.gpu_stats = {
-                'gpu_uuid': [i['gpu_uuid'] for i in current_gpu_stats],
-                'gpu_name': [i['gpu_name'] for i in current_gpu_stats],
-                'gpu_usage': [copy.deepcopy([i['gpu_usage']]*300) for i in current_gpu_stats],
-                'gpu_memory': [copy.deepcopy([i['gpu_memory']]*300) for i in current_gpu_stats],
-                'gpu_total_memory': [i['gpu_total_memory'] for i in current_gpu_stats],
-                'gpu_power_draw': [copy.deepcopy([i['gpu_power_draw']]*300) for i in current_gpu_stats],
+        current_system_stats = get_system_info(gpu_ids = self.gpu_ids, full=True)
+        self.system_stats = {
+                'gpu_id' : self.gpu_ids,
+                'cpu_name' : current_system_stats['cpu_name'],
+                'cpu_count': current_system_stats['cpu_count'],
+                'cpu_usage': copy.deepcopy([current_system_stats['cpu_usage']]*300),
+                'ram_total': current_system_stats['ram_total'],
+                'ram_usage' : copy.deepcopy([current_system_stats['ram_usage']]*300),
+                'gpu_uuid': current_system_stats['gpu_uuid'],
+                'gpu_name': current_system_stats['gpu_name'],
+                'gpu_usage': [copy.deepcopy([i]*300) for i in current_system_stats['gpu_usage']],
+                'gpu_memory': [copy.deepcopy([i]*300) for i in current_system_stats['gpu_memory']],
+                'gpu_total_memory': current_system_stats['gpu_total_memory'],
+                'gpu_power_draw': [copy.deepcopy([i]*300) for i in current_system_stats['gpu_power_draw']],
+                'gpu_power_limit' : current_system_stats['gpu_power_limit'],
                 'gpu_task' : [],
             }
 
@@ -118,12 +78,15 @@ class gpu_runner(base_runner):
         
         self.logger.info(f"GPU Runner initiated. Configure to utilize GPU {list2str(gpu_ids)}. loader_mode={self.loader_mode}")
     
-    def update_gpu_stats(self):
-        current_gpu_stats = get_gpu_info(gpu_ids = self.gpu_ids, full=False)
+    def update_system_stats(self):
+        current_system_stats = get_system_info(gpu_ids = self.gpu_ids, full=False)
         for idx in range(len(self.gpu_ids)):
-            self.gpu_stats['gpu_usage'][idx] = self.gpu_stats['gpu_usage'][idx][1:] + [current_gpu_stats[idx]['gpu_usage']]
-            self.gpu_stats['gpu_memory'][idx] = self.gpu_stats['gpu_memory'][idx][1:] + [current_gpu_stats[idx]['gpu_memory']]
-            self.gpu_stats['gpu_power_draw'][idx] = self.gpu_stats['gpu_power_draw'][idx][1:] + [current_gpu_stats[idx]['gpu_power_draw']]
+            self.system_stats['gpu_usage'][idx] = self.system_stats['gpu_usage'][idx][1:] + [current_system_stats['gpu_usage'][idx]]
+            self.system_stats['gpu_memory'][idx] = self.system_stats['gpu_memory'][idx][1:] + [current_system_stats['gpu_memory'][idx]]
+            self.system_stats['gpu_power_draw'][idx] = self.system_stats['gpu_power_draw'][idx][1:] + [current_system_stats['gpu_power_draw'][idx]]
+        self.system_stats['ram_usage'] = self.system_stats['ram_usage'][1:] + [current_system_stats['ram_usage']]
+        self.system_stats['cpu_usage'] = self.system_stats['cpu_usage'][1:] + [current_system_stats['cpu_usage']]
+        
     
     def block_gpu(self, x : str | int | List) -> None:
         if isinstance(x, str) and x == "all":
@@ -188,8 +151,8 @@ class gpu_runner(base_runner):
             else:
                 self.update_task_list([visualizer_response['task_to_queue']], mode='append') # input must be list
         
-        if 'update_gpu_stats' in visualizer_response.keys() and visualizer_response['update_gpu_stats'] is True:
-            self.update_gpu_stats()
+        if 'update_system_stats' in visualizer_response.keys() and visualizer_response['update_system_stats'] is True:
+            self.update_system_stats()
 
         if self.loader_mode:
             self._current_cmd = self.loader.pop(delete_first_entry=False)
@@ -273,9 +236,9 @@ class gpu_runner(base_runner):
         else:
             task_queue = self.task_list
         
-        self.gpu_stats['gpu_task'] = gpu_task
+        self.system_stats['gpu_task'] = gpu_task
                 
-        runner_visualization = {'status' : self.gpu_stats,
+        runner_visualization = {'status' : self.system_stats,
                                 'task_status' : {'running_tasks' : self._current_ongoing_task,
                                                 'queued_tasks' : task_queue,
                                                 'completed_tasks' : self.completed_tasks,

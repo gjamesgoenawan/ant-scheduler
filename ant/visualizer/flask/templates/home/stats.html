@@ -9,11 +9,70 @@
 {% block content %}
 
     <div class="container-fluid py-4">
-      <div class="row mb-4">
-        <div id="gpu-container" class="row"></div>
+      <div class="row mb-2">
+        <div id="gpu_container" class="row"></div>
       </div>
-      
-
+      <div class="row mb-2">
+        <div class="row">
+          <div class="col-lg-12 col-md-12 mb-2">
+            <div class="card">
+              <div class="card-header pb-0 bg-transparent">
+                <h6>Runner Status</h6>
+              </div>
+              <div class="card-body pt-1">
+                <div class="row">
+                  <div class="col-lg-4 col-md-6 mt-0 mb-2">
+                    <center>
+                      <h1 style='margin-bottom:0'>
+                        <div id="queued_task_count">
+                        </div>
+                      </h1>
+                      Queued Tasks
+                    </center>
+                  </div>
+                  <div class="col-lg-4 col-md-6 mt-0 mb-2">
+                    <center>
+                      <h1 style='margin-bottom:0'>
+                        <div id="running_task_count">
+                        </div>
+                      </h1>
+                      Running Tasks
+                    </center>
+                  </div>
+                  <div class="col-lg-4 col-md-6 mt-0 mb-2">
+                    <center>
+                      <h1 style='margin-bottom:0'>
+                        <div id="completed_task_count">
+                        </div>
+                      </h1>
+                      Completed Tasks
+                    </center>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row mb-2">
+        <div class="row">
+          <div class="col-lg-12 col-md-12 mb-2">
+            <div class="card">
+              <div class="card-header pb-0 bg-transparent">
+                <h6>Worker Status</h6>
+              </div>
+              <div class="card-body pt-1">
+                <div class="row">
+                  <div class="col-lg-4 col-md-6 mt-0 mb-2">
+                    <div id="worker_status_container">
+                    </div>
+                  </div>
+                </div>
+              </div> 
+            </div>
+          </div>
+        </div>
+      </div>
       {% include 'includes/footer.html' %}
     </div>
 
@@ -24,313 +83,554 @@
 
 <script src="static/assets/js/plugins/chartjs.min.js"></script>
 <script>
-  function createGpuEntry(visData) {
-    const container = document.getElementById('gpu-container');
-    for (let gpuIndex = 0; gpuIndex < visData.runner_visualization.status.gpu_name.length; gpuIndex++) {
-      const entry = document.createElement('div');
-      entry.className = "col-lg-6 mb-4";
-      entry.innerHTML = `
-        <div class="card">
-          <div class="card-header pb-0">
-            <h6>GPU ${gpuIndex} : ${visData.runner_visualization.status.gpu_name[gpuIndex]}</h6>
-            <p> Status : ${visData.runner_visualization.status.gpu_task[gpuIndex]}</p>
-          </div>
-          <div class="card-body pt-1">
-            <div class="row">
-              <div class="col-lg-4 col-md-6 mt-0 mb-4">
-                  <div class="bg-gradient-primary shadow-primary border-radius-lg py-3 pe-1">
-                      <div class="chart">
-                        <canvas id="${gpuIndex}_usage" class="chart-canvas" height="170"></canvas>
-                      </div>
-                  </div>
-              </div>
-              <div class="col-lg-4 col-md-6 mt-0 mb-4">
-                <div class="bg-gradient-success shadow-dark border-radius-lg py-3 pe-1">
-                  <div class="chart">
-                    <canvas id="${gpuIndex}_memory" class="chart-canvas" height="170"></canvas>
-                  </div>
+  function createSystemChart(visData) {
+    const container = document.getElementById('gpu_container');
+    container.innerHTML = `
+    <div class="col-lg-6 col-md-6 mb-2">
+      <div class="card bg-gradient-primary">
+        <div class="card-header pb-0 bg-transparent">
+          <h6 style="color: #FFFFFF;white-space: nowrap;overflow: hidden;text-overflow: ellipsis;"">CPU : ${visData.runner_visualization.status.cpu_count}x ${visData.runner_visualization.status.cpu_name}</h6>
+        </div>
+        <div class="card-body pt-1">
+          <div class="row">
+            <div class="col-lg-6 col-md-6 mt-0 mb-2">
+                <div class="bg-transparent border-radius-lg py-3 pe-1">
+                    <div class="chart">
+                      <canvas id="cpu_usage_chart" class="chart-canvas" height="170"></canvas>
+                    </div>
                 </div>
-              </div>
-              <div class="col-lg-4 col-md-6 mt-0 mb-4">
-                <div class="bg-gradient-dark shadow-dark border-radius-lg py-3 pe-1">
-                  <div class="chart">
-                    <canvas id="${gpuIndex}_power" class="chart-canvas" height="170"></canvas>
-                  </div>
+            </div>
+            <div class="col-lg-6 col-md-6 mt-0 mb-2">
+              <div class="bg-transparent border-radius-lg py-3 pe-1">
+                <div class="chart">
+                  <canvas id="ram_chart" class="chart-canvas" height="170"></canvas>
                 </div>
               </div>
             </div>
           </div>
-        </div>`
-      container.appendChild(entry);
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6 col-md-6 mb-2">
+      <div class="card bg-gradient-secondary">
+        <div class="card-header pb-0 bg-transparent">
+          <h6 style="color: #FFFFFF;white-space: nowrap;overflow: hidden;text-overflow: ellipsis;">GPU: ${Object.entries(visData.runner_visualization.status.gpu_name.reduce((acc, name) => {acc[name] = (acc[name] || 0) + 1;return acc;}, {})).map(([name, count]) => `${count}x ${name}`).join(', ')}</h6>
+        </div>
+        <div class="card-body pt-1">
+          <div class="row">
+            <div class="col-lg-6 col-md-6 mt-0 mb-2">
+                <div class="bbg-transparent border-radius-lg py-3 pe-1">
+                    <div class="chart">
+                      <canvas id="gpu_usage_chart" class="chart-canvas" height="170"></canvas>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6 col-md-6 mt-0 mb-2">
+              <div class="bg-transparent border-radius-lg py-3 pe-1">
+                <div class="chart">
+                  <canvas id="gpu_memory_chart" class="chart-canvas" height="170"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`
 
-      var ctx = document.getElementById(`${gpuIndex}_usage`).getContext("2d");
+    let gpu_usage_dataset = []
+    let gpu_memory_dataset = []
+    let gpu_power_dataset = []
+    let gpu_memory_max_value = Math.max(...visData.runner_visualization.status.gpu_total_memory);
+    let gpu_power_limit_max_value = Math.max(...visData.runner_visualization.status.gpu_power_limit);
 
-      new Chart(ctx, {
-        type: "line",
-        data: {
-          labels: fiveMinLabel,
-          datasets: [{
-            label: `GPU ${gpuIndex} Usage`,
-            tension: 0,
-            borderWidth: 0,
-            pointRadius: 1,
-            pointBackgroundColor: "rgba(255, 255, 255, .8)",
-            pointBorderColor: "transparent",
-            borderColor: "rgba(255, 255, 255, .8)",
-            borderColor: "rgba(255, 255, 255, .8)",
-            borderWidth: 1,
-            backgroundColor: "transparent",
-            fill: false,
-            data: visData.runner_visualization.status.gpu_usage[gpuIndex],
-            maxBarThickness: 1
+    let gpu_status_html = ``
+    for (let i = 0; i < visData.runner_visualization.status.gpu_name.length; i++) {
+      gpu_usage_dataset.push({
+          label: `GPU ${visData.runner_visualization.status.gpu_id[i]}`,
+          tension: 0,
+          borderWidth: 0,
+          pointRadius: 1,
+          pointBackgroundColor: "rgba(255, 255, 255, .8)",
+          pointBorderColor: "transparent",
+          borderColor: "rgba(255, 255, 255, .8)",
+          borderColor: "rgba(255, 255, 255, .8)",
+          borderWidth: 1,
+          backgroundColor: "transparent",
+          fill: false,
+          data: visData.runner_visualization.status.gpu_usage[i],
+          maxBarThickness: 1
+        })
+        gpu_memory_dataset.push({
+          label: `GPU ${visData.runner_visualization.status.gpu_id[i]}`,
+          tension: 0,
+          borderWidth: 0,
+          pointRadius: 1,
+          pointBackgroundColor: "rgba(255, 255, 255, .8)",
+          pointBorderColor: "transparent",
+          borderColor: "rgba(255, 255, 255, .8)",
+          borderColor: "rgba(255, 255, 255, .8)",
+          borderWidth: 1,
+          backgroundColor: "transparent",
+          fill: false,
+          data: visData.runner_visualization.status.gpu_memory[i],
+          maxBarThickness: 1
+        })
+        gpu_power_dataset.push({
+          label: `GPU ${visData.runner_visualization.status.gpu_id[i]}`,
+          tension: 0,
+          borderWidth: 0,
+          pointRadius: 1,
+          pointBackgroundColor: "rgba(255, 255, 255, .8)",
+          pointBorderColor: "transparent",
+          borderColor: "rgba(255, 255, 255, .8)",
+          borderColor: "rgba(255, 255, 255, .8)",
+          borderWidth: 1,
+          backgroundColor: "transparent",
+          fill: false,
+          data: visData.runner_visualization.status.gpu_power_draw[i],
+          maxBarThickness: 1
+        })
 
-          }],
+        gpu_status_html += `<div class="row">
+                              <div class="col-lg-2" id="gpu_${i}_status"></div> 
+                              <div class="col-lg-10">
+                                ${visData.runner_visualization.status.gpu_name[i]}
+                              </div>
+                            </div>
+                            <hr>`
+      }
+
+    var ctx = document.getElementById(`gpu_usage_chart`).getContext("2d");
+    new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: fiveMinLabel,
+        datasets: gpu_usage_dataset,
+      },
+      options: {
+        animation: false,
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false,
+          }
         },
-        options: {
-          animation: false,
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              display: false,
+        interaction: {
+          intersect: false,
+          mode: 'index',
+        },
+        scales: {
+          y: {
+            min: 0,
+            max: 100,
+            grid: {
+              drawBorder: false,
+              display: true,
+              drawOnChartArea: true,
+              drawTicks: false,
+              borderDash: [5, 5],
+              color: 'rgba(255, 255, 255, .2)'
+            },
+            ticks: {
+              display: true,
+              color: '#f8f9fa',
+              padding: 5,
+              font: {
+                size: 12,
+                weight: 300,
+                family: "Roboto",
+                style: 'normal',
+                lineHeight: 2
+              },
+            },
+            title: {
+              display: true,
+              text: 'Usage (%)',
+              color: '#FFFFFF',
+              font: {
+                size: 14,
+                weight: 300,
+                family: "Roboto",
+                style: 'normal',
+                lineHeight: 2
+              },
             }
           },
-          interaction: {
-            intersect: false,
-            mode: 'index',
-          },
-          scales: {
-            y: {
-              grid: {
-                drawBorder: false,
-                display: true,
-                drawOnChartArea: true,
-                drawTicks: false,
-                borderDash: [5, 5],
-                color: 'rgba(255, 255, 255, .2)'
-              },
-              ticks: {
-                display: true,
-                color: '#f8f9fa',
-                padding: 10,
-                font: {
-                  size: 14,
-                  weight: 300,
-                  family: "Roboto",
-                  style: 'normal',
-                  lineHeight: 2
-                },
-              }
-            },
-            x: {
-              grid: {
-                drawBorder: false,
-                display: false,
-                drawOnChartArea: false,
-                drawTicks: false,
-                borderDash: [5, 5]
-              },
-              ticks: {
-                display: false,
-                color: '#f8f9fa',
-                padding: 10,
-                font: {
-                  size: 14,
-                  weight: 300,
-                  family: "Roboto",
-                  style: 'normal',
-                  lineHeight: 2
-                },
-              }
-            },
-          },
-        },
-      });
-
-      var ctx = document.getElementById(`${gpuIndex}_memory`).getContext("2d");
-
-      new Chart(ctx, {
-        type: "line",
-        data: {
-          labels: fiveMinLabel,
-          datasets: [{
-            label: `GPU ${gpuIndex} Memory`,
-            tension: 0,
-            borderWidth: 0,
-            pointRadius: 1,
-            pointBackgroundColor: "rgba(255, 255, 255, .8)",
-            pointBorderColor: "transparent",
-            borderColor: "rgba(255, 255, 255, .8)",
-            borderColor: "rgba(255, 255, 255, .8)",
-            borderWidth: 1,
-            backgroundColor: "transparent",
-            fill: false,
-            data: visData.runner_visualization.status.gpu_memory[gpuIndex],
-            maxBarThickness: 1
-          }],
-        },
-        options: {
-          animation: false,
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
+          x: {
+            grid: {
+              drawBorder: false,
               display: false,
+              drawOnChartArea: false,
+              drawTicks: false,
+              borderDash: [5, 5]
+            },
+            ticks : {
+              display: false,
+            },
+          },
+        },
+      },
+    });
+
+    var ctx = document.getElementById(`gpu_memory_chart`).getContext("2d");
+    new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: fiveMinLabel,
+        datasets: gpu_memory_dataset,
+      },
+      options: {
+        animation: false,
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false,
+          }
+        },
+        interaction: {
+          intersect: false,
+          mode: 'index',
+        },
+        scales: {
+          y: {
+            min: 0,
+            max: gpu_memory_max_value,
+            grid: {
+              drawBorder: false,
+              display: true,
+              drawOnChartArea: true,
+              drawTicks: false,
+              borderDash: [5, 5],
+              color: 'rgba(255, 255, 255, .2)'
+            },
+            ticks: {
+              display: true,
+              color: '#f8f9fa',
+              padding: 5,
+              font: {
+                size: 12,
+                weight: 300,
+                family: "Roboto",
+                style: 'normal',
+                lineHeight: 2
+              },
+            },
+            title: {
+              display: true,
+              text: 'Memory (GBs)',
+              color: '#FFFFFF',
+              font: {
+                size: 14,
+                weight: 300,
+                family: "Roboto",
+                style: 'normal',
+                lineHeight: 2
+              },
             }
           },
-          interaction: {
-            intersect: false,
-            mode: 'index',
-          },
-          scales: {
-            y: {
-              grid: {
-                drawBorder: false,
-                display: true,
-                drawOnChartArea: true,
-                drawTicks: false,
-                borderDash: [5, 5],
-                color: 'rgba(255, 255, 255, .2)'
-              },
-              ticks: {
-                display: true,
-                color: '#f8f9fa',
-                padding: 10,
-                font: {
-                  size: 14,
-                  weight: 300,
-                  family: "Roboto",
-                  style: 'normal',
-                  lineHeight: 2
-                },
-              }
-            },
-            x: {
-              grid: {
-                drawBorder: false,
-                display: false,
-                drawOnChartArea: false,
-                drawTicks: false,
-                borderDash: [5, 5]
-              },
-              ticks: {
-                display: false,
-                color: '#f8f9fa',
-                padding: 10,
-                font: {
-                  size: 14,
-                  weight: 300,
-                  family: "Roboto",
-                  style: 'normal',
-                  lineHeight: 2
-                },
-              }
-            },
-          },
-        },
-      });
-      
-      var ctx = document.getElementById(`${gpuIndex}_power`).getContext("2d");
-
-      new Chart(ctx, {
-        type: "line",
-        data: {
-          labels: fiveMinLabel,
-          datasets: [{
-            label: `GPU ${gpuIndex} Power Usage`,
-            tension: 0,
-            borderWidth: 0,
-            pointRadius: 1,
-            pointBackgroundColor: "rgba(255, 255, 255, .8)",
-            pointBorderColor: "transparent",
-            borderColor: "rgba(255, 255, 255, .8)",
-            borderColor: "rgba(255, 255, 255, .8)",
-            borderWidth: 1,
-            backgroundColor: "transparent",
-            fill: false,
-            data: visData.runner_visualization.status.gpu_memory[gpuIndex],
-            maxBarThickness: 1
-
-          }],
-        },
-        options: {
-          animation: false,
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
+          x: {
+            grid: {
+              drawBorder: false,
               display: false,
+              drawOnChartArea: false,
+              drawTicks: false,
+              borderDash: [5, 5]
+            },
+            ticks : {
+              display: false,
+            },
+          },
+        },
+      },
+    });
+    
+    // var ctx = document.getElementById(`gpu_power_chart`).getContext("2d");
+    // new Chart(ctx, {
+    //   type: "line",
+    //   data: {
+    //     labels: fiveMinLabel,
+    //     datasets: gpu_power_dataset,
+    //   },
+    //   options: {
+    //     animation: false,
+    //     responsive: true,
+    //     maintainAspectRatio: false,
+    //     plugins: {
+    //       legend: {
+    //         display: false,
+    //       }
+    //     },
+    //     interaction: {
+    //       intersect: false,
+    //       mode: 'index',
+    //     },
+    //     scales: {
+    //       y: {
+    //         min: 0,
+    //         max: gpu_power_limit_max_value,
+    //         grid: {
+    //           drawBorder: false,
+    //           display: true,
+    //           drawOnChartArea: true,
+    //           drawTicks: false,
+    //           borderDash: [5, 5],
+    //           color: 'rgba(255, 255, 255, .2)'
+    //         },
+    //         ticks: {
+    //           display: true,
+    //           color: '#f8f9fa',
+    //           padding: 5,
+    //           font: {
+    //             size: 12,
+    //             weight: 300,
+    //             family: "Roboto",
+    //             style: 'normal',
+    //             lineHeight: 2
+    //           },
+    //         },
+    //         title: {
+    //           display: true,
+    //           text: 'Power (W)',
+    //           color: '#FFFFFF',
+    //           font: {
+    //             size: 14,
+    //             weight: 300,
+    //             family: "Roboto",
+    //             style: 'normal',
+    //             lineHeight: 2
+    //           },
+    //         }
+    //       },
+    //       x: {
+    //         grid: {
+    //           drawBorder: false,
+    //           display: false,
+    //           drawOnChartArea: false,
+    //           drawTicks: false,
+    //           borderDash: [5, 5]
+    //         },
+    //         ticks : {
+    //           display: false,
+    //         },
+    //       },
+    //     },
+    //   },
+    // });
+    
+    var ctx = document.getElementById(`cpu_usage_chart`).getContext("2d");
+    new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: fiveMinLabel,
+        datasets: [{
+          label: `CPU Usage`,
+          tension: 0,
+          borderWidth: 0,
+          pointRadius: 1,
+          pointBackgroundColor: "rgba(255, 255, 255, .8)",
+          pointBorderColor: "transparent",
+          borderColor: "rgba(255, 255, 255, .8)",
+          borderColor: "rgba(255, 255, 255, .8)",
+          borderWidth: 1,
+          backgroundColor: "transparent",
+          fill: false,
+          data: visData.runner_visualization.status.cpu_usage,
+          maxBarThickness: 1
+        }],
+      },
+      options: {
+        animation: false,
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false,
+          }
+        },
+        interaction: {
+          intersect: false,
+          mode: 'index',
+        },
+        scales: {
+          y: {
+            min: 0,
+            max: 100,
+            grid: {
+              drawBorder: false,
+              display: true,
+              drawOnChartArea: true,
+              drawTicks: false,
+              borderDash: [5, 5],
+              color: 'rgba(255, 255, 255, .2)'
+            },
+            ticks: {
+              display: true,
+              color: '#f8f9fa',
+              padding: 5,
+              font: {
+                size: 12,
+                weight: 300,
+                family: "Roboto",
+                style: 'normal',
+                lineHeight: 2
+              },
+            },
+            title: {
+              display: true,
+              text: 'Usage (%)',
+              color: '#FFFFFF',
+              font: {
+                size: 14,
+                weight: 300,
+                family: "Roboto",
+                style: 'normal',
+                lineHeight: 2
+              },
             }
           },
-          interaction: {
-            intersect: false,
-            mode: 'index',
-          },
-          scales: {
-            y: {
-              grid: {
-                drawBorder: false,
-                display: true,
-                drawOnChartArea: true,
-                drawTicks: false,
-                borderDash: [5, 5],
-                color: 'rgba(255, 255, 255, .2)'
-              },
-              ticks: {
-                display: true,
-                color: '#f8f9fa',
-                padding: 10,
-                font: {
-                  size: 14,
-                  weight: 300,
-                  family: "Roboto",
-                  style: 'normal',
-                  lineHeight: 2
-                },
-              }
+          x: {
+            grid: {
+              drawBorder: false,
+              display: false,
+              drawOnChartArea: false,
+              drawTicks: false,
+              borderDash: [5, 5]
             },
-            x: {
-              grid: {
-                drawBorder: false,
-                display: false,
-                drawOnChartArea: false,
-                drawTicks: false,
-                borderDash: [5, 5]
-              },
-              ticks: {
-                display: false,
-                color: '#f8f9fa',
-                padding: 10,
-                font: {
-                  size: 14,
-                  weight: 300,
-                  family: "Roboto",
-                  style: 'normal',
-                  lineHeight: 2
-                },
-              }
+            ticks : {
+              display: false,
             },
           },
         },
-      });
-    }
+      },
+    });
+
+    var ctx = document.getElementById(`ram_chart`).getContext("2d");
+    new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: fiveMinLabel,
+        datasets: [{
+          label: `RAM Usage`,
+          tension: 0,
+          borderWidth: 0,
+          pointRadius: 1,
+          pointBackgroundColor: "rgba(255, 255, 255, .8)",
+          pointBorderColor: "transparent",
+          borderColor: "rgba(255, 255, 255, .8)",
+          borderColor: "rgba(255, 255, 255, .8)",
+          borderWidth: 1,
+          backgroundColor: "transparent",
+          fill: false,
+          data: visData.runner_visualization.status.ram_usage,
+          maxBarThickness: 1
+        }],
+      },
+      options: {
+        animation: false,
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false,
+          }
+        },
+        interaction: {
+          intersect: false,
+          mode: 'index',
+        },
+        scales: {
+          y: {
+            min: 0,
+            max: visData.runner_visualization.status.ram_total,
+            grid: {
+              drawBorder: false,
+              display: true,
+              drawOnChartArea: true,
+              drawTicks: false,
+              borderDash: [5, 5],
+              color: 'rgba(255, 255, 255, .2)'
+            },
+            ticks: {
+              display: true,
+              color: '#f8f9fa',
+              padding: 5,
+              font: {
+                size: 12,
+                weight: 300,
+                family: "Roboto",
+                style: 'normal',
+                lineHeight: 2
+              },
+            },
+            title: {
+              display: true,
+              text: 'RAM (GBs)',
+              color: '#FFFFFF',
+              font: {
+                size: 14,
+                weight: 300,
+                family: "Roboto",
+                style: 'normal',
+                lineHeight: 2
+              },
+            }
+          },
+          x: {
+            grid: {
+              drawBorder: false,
+              display: false,
+              drawOnChartArea: false,
+              drawTicks: false,
+              borderDash: [5, 5]
+            },
+            ticks : {
+              display: false,
+            },
+          },
+        },
+      },
+    });
+    
+    const worker_status_container = document.getElementById('worker_status_container');
+    worker_status_container.innerHTML = gpu_status_html
+
   }
 
-  function updateGpuEntry(visData_local) {
+  function updateSystemChart(visData_local) {
+    const gpu_usage_chart = Chart.getChart(`gpu_usage_chart`);
+    const gpu_memory_chart = Chart.getChart(`gpu_memory_chart`);
+    // const gpu_power_chart = Chart.getChart(`gpu_usage_chart`);
+    const cpu_usage_chart = Chart.getChart(`cpu_usage_chart`);
+    const ram_chart = Chart.getChart(`ram_chart`);
+
     for (let i = 0; i < visData_local.runner_visualization.status.gpu_name.length; i++) {
-      const chart = Chart.getChart(`${i}_usage`);
-      chart.data.datasets[0].data = visData_local.runner_visualization.status.gpu_usage[i];
-      chart.update()
-
-      const chart2 = Chart.getChart(`${i}_memory`);
-      chart2.data.datasets[0].data = visData_local.runner_visualization.status.gpu_memory[i];
-      chart2.update()
-
-      const chart3 = Chart.getChart(`${i}_power`);
-      chart3.data.datasets[0].data = visData_local.runner_visualization.status.gpu_power_draw[i];
-      chart3.update()
+      gpu_usage_chart.data.datasets[i].data = visData_local.runner_visualization.status.gpu_usage[i];
+      gpu_memory_chart.data.datasets[i].data = visData_local.runner_visualization.status.gpu_memory[i];   
+      
+      let current_gpu_status_container = document.getElementById(`gpu_${i}_status`);
+      if (visData_local.runner_visualization.status.gpu_task[i] == 'IDLE') {
+        current_gpu_status_container.innerHTML = `<center><span class="badge badge-sm bg-gradient-success">IDLE</span></center>`
+      }
+      else {
+        current_gpu_status_container.innerHTML = `<center><span class="badge badge-sm bg-gradient-danger">BUSY</span></center>`
+      }
     }
+    cpu_usage_chart.data.datasets[0].data = visData_local.runner_visualization.status.cpu_usage;
+    ram_chart.data.datasets[0].data = visData_local.runner_visualization.status.ram_usage;
 
+    gpu_usage_chart.update()
+    gpu_memory_chart.update()
+
+    const queued_task = document.getElementById('queued_task_count');
+    queued_task.innerHTML = `${visData_local.runner_visualization.task_status.queued_tasks.length}`
+
+    const running_task = document.getElementById('running_task_count');
+    running_task.innerHTML = `${visData_local.runner_visualization.task_status.running_tasks.length}`
+
+    const completed_task = document.getElementById('completed_task_count');
+    completed_task.innerHTML = `${visData_local.runner_visualization.task_status.completed_tasks.length}`
   }
   let chartCreated = false;
   
@@ -338,11 +638,12 @@
       console.log('Received new data!');
 
       if (chartCreated) {
-        updateGpuEntry(visData_local)
+        updateSystemChart(visData_local)
         
       }
       else {
-        createGpuEntry(visData_local)
+        createSystemChart(visData_local)
+        updateSystemChart(visData_local)
         chartCreated = true;
       }
   });
