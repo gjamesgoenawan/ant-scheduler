@@ -610,7 +610,8 @@
       gpu_memory_chart.data.datasets[i].data = visData_local.runner_visualization.status.gpu_memory[i];   
       
       let current_gpu_status_container = document.getElementById(`gpu_${i}_status`);
-      if (visData_local.runner_visualization.status.gpu_task[i] == 'IDLE') {
+      console.log(visData_local.runner_visualization.status.gpu_availability)
+      if (visData_local.runner_visualization.status.gpu_availability[i] == 1) {
         current_gpu_status_container.innerHTML = `<center><span class="badge badge-sm bg-gradient-success">IDLE</span></center>`
       }
       else {

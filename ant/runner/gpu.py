@@ -22,10 +22,12 @@ class gpu_runner(base_runner):
                  gpu_ids : List[str], 
                  handler : base_handler, 
                  loader : Optional[base_loader] = None,
-                 logger : Optional[base_logger] = None,) -> None:
+                 logger : Optional[base_logger] = None,
+                 auto_detect_gpu_status = False) -> None:
         
         self.gpu_names = get_gpu_names()
         self.gpu_ids = gpu_ids
+        self.auto_detect_gpu_status = auto_detect_gpu_status
         
         # Sanity Check if the system support the specified gpu devices
         if max(self.gpu_ids) > len(self.gpu_names):
@@ -53,6 +55,7 @@ class gpu_runner(base_runner):
                 'gpu_power_draw': [copy.deepcopy([i]*300) for i in current_system_stats['gpu_power_draw']],
                 'gpu_power_limit' : current_system_stats['gpu_power_limit'],
                 'gpu_task' : [],
+                'gpu_availability' : [],
             }
 
         if self.original_logger.log_file_name is not None:
@@ -76,7 +79,7 @@ class gpu_runner(base_runner):
         
         self.completed_tasks = []
         
-        self.logger.info(f"GPU Runner initiated. Configure to utilize GPU {list2str(gpu_ids)}. loader_mode={self.loader_mode}")
+        self.logger.info(f"GPU Runner initiated. Configure to utilize GPU {list2str(gpu_ids)}. loader_mode={self.loader_mode}, auto_detect_gpu_status={self.auto_detect_gpu_status}")
     
     def update_system_stats(self):
         current_system_stats = get_system_info(gpu_ids = self.gpu_ids, full=False)
@@ -86,6 +89,23 @@ class gpu_runner(base_runner):
             self.system_stats['gpu_power_draw'][idx] = self.system_stats['gpu_power_draw'][idx][1:] + [current_system_stats['gpu_power_draw'][idx]]
         self.system_stats['ram_usage'] = self.system_stats['ram_usage'][1:] + [current_system_stats['ram_usage']]
         self.system_stats['cpu_usage'] = self.system_stats['cpu_usage'][1:] + [current_system_stats['cpu_usage']]
+
+        if self.auto_detect_gpu_status:
+            for idx, usage_hist in enumerate(self.system_stats['gpu_usage']):
+                # last 20 seconds, more than 50% usage, considered as blocked
+                # last 20 seconds, more then 50% memory, considered as blocked
+                if sum(usage_hist[-20:])/20 > 50 or (sum(self.system_stats['gpu_memory'][idx][-20:])/20)/self.system_stats['gpu_total_memory'][idx] > 0.5: 
+                    self.gpu_availability[idx] = 0
+                else:
+                    # only unblock gpu if no ant-runner task is assigned to it.
+                    assigned = False
+                    for ongoing_task in self._current_ongoing_task:
+                        if idx in ongoing_task['gpu_idx']:
+                            assigned = True
+                            break
+                    if not assigned:
+                        self.gpu_availability[idx] = 1
+
         
     
     def block_gpu(self, x : str | int | List) -> None:
@@ -147,9 +167,9 @@ class gpu_runner(base_runner):
         
         if 'task_to_queue' in visualizer_response.keys(): # add_queued_job
             if self.loader_mode:
-                self.loader.append([visualizer_response['task_to_queue']])
+                self.loader.append(visualizer_response['task_to_queue'])
             else:
-                self.update_task_list([visualizer_response['task_to_queue']], mode='append') # input must be list
+                self.update_task_list(visualizer_response['task_to_queue'], mode='append') # input must be list
         
         if 'update_system_stats' in visualizer_response.keys() and visualizer_response['update_system_stats'] is True:
             self.update_system_stats()
@@ -225,19 +245,21 @@ class gpu_runner(base_runner):
     def vis(self, vis_prop = {'max_width' : INF, 'max_height' : 20, 'text_wrap' : 'no-wrap', 'terminal_win_height' : 20, 'terminal_win_width' : INF}):
         current_vis = self.handler.vis(vis_prop)
 
-        # runner_visualizer
+        # task assigned to each gpu (if not available, set to IDLE)
         gpu_task = ["IDLE" for i in range(len(self.gpu_availability))]
         for task in self._current_ongoing_task:
             for _gpu_idx in task['gpu_idx']:
                 gpu_task[_gpu_idx] = task['task_id']
+        self.system_stats['gpu_task'] = gpu_task
+
+        # update system_stats' gpu_availability 
+        self.system_stats['gpu_availability'] = self.gpu_availability
 
         if self.loader_mode:
             task_queue = self.loader.get_queue()
         else:
             task_queue = self.task_list
-        
-        self.system_stats['gpu_task'] = gpu_task
-                
+     
         runner_visualization = {'status' : self.system_stats,
                                 'task_status' : {'running_tasks' : self._current_ongoing_task,
                                                 'queued_tasks' : task_queue,

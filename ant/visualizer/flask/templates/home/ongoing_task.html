@@ -45,6 +45,19 @@
       <div id="ongoing_task">
       </div>
 
+      <div class="container-fluid py-4">
+        <div id="completed_task">
+        </div>
+        <div class="position-fixed bottom-1 end-1 z-index-2">
+          <div class="toast fade hide p-2 bg-white mb-3" id="test-copy">
+            <div class="toast-header border-0">
+              <i class="material-icons text-success me-2">check</i>
+              <span class="me-auto font-weight-bold">Commands Copied Successfully!</span>
+            </div>
+          </div>  
+        </div>      
+      </div>
+  
       {% include 'includes/footer.html' %}
     </div>
 
@@ -70,8 +83,9 @@
                               <div class="terminal-window">
                                 <div class="terminal-content" id="terminal-content-${idx}" style='scroll-top: 100%;'></div>
                               </div>
-                              <form action="/terminate_task" method="post" style="margin-top: 10px; text-align: right;">
-                              </form>
+                              <div id='action-buttons' style="text-align: right; float: right;">
+                                
+                              </div>
                             </ul>
                           </div>
                         </div>
@@ -90,7 +104,7 @@
       card_gpu_ids = cards.children[1].children[0].children[1]
       card_command = cards.children[1].children[0].children[2]
       terminal_window = cards.children[1].children[0].children[3].children[0];
-      terminate_button = cards.children[1].children[0].children[4];
+      action_buttons = cards.children[1].children[0].children[4];
 
       var oldScrollTop = terminal_window.scrollTop;
       terminal_window.innerHTML = `${visData.runner_visualization.task_status.terminal_logs[idx].join("\n")}`;
@@ -99,8 +113,11 @@
       card_title.innerHTML = `<h4>${visData.runner_visualization.task_status.running_tasks[idx].task_id}</h4>`
       card_gpu_ids.innerHTML = `<strong class="text-dark">GPU IDs :</strong> &nbsp; ${visData.runner_visualization.task_status.running_tasks[idx].gpu_ids} `
       card_command.innerHTML = `<strong class="text-dark">Command :</strong> &nbsp; ${visData.runner_visualization.task_status.running_tasks[idx].command} `
-      terminate_button.innerHTML = `<input type="hidden" name="task_id" value="${visData.runner_visualization.task_status.running_tasks[idx].task_id}">
-                                    <button type="submit" class="btn btn-danger">Terminate</button>`
+      action_buttons.innerHTML = `<button class="btn btn-link text-dark px-3 py-0 mb-3" onclick="copyCommandToClipboard('command-${idx}')"><i class="material-icons text-m me-2">copy</i></button>
+                                  <button class="btn btn-link text-dark px-3 py-0 mb-3" style='margin-right:10px;' onclick="window.open('/view_log/${visData.runner_visualization.task_status.running_tasks[idx].task_id}', '_blank')"><i class="material-icons text-m me-2">open_in_new</i></button> 
+                                  <button class="btn btn-danger" onclick="location.href='/terminate_task/${visData.runner_visualization.task_status.running_tasks[idx].task_id}'">Terminate</button>`
+      // terminate_button.innerHTML = `<input type="hidden" name="task_id" value="${visData.runner_visualization.task_status.running_tasks[idx].task_id}">
+      //                              <button type="submit" class="btn btn-danger">Terminate</button>`
     }
   };
 
@@ -120,6 +137,19 @@
         console.log('Received new data!');
         updateOngoingTask(visData_local);
   });
+
+  function copyCommandToClipboard(element_id) {
+    const commandText = document.getElementById(element_id).textContent;
+    const commands = commandText.split(';').slice(1).join(';').slice(1);
+    navigator.clipboard.writeText(commands).then(() => {
+      console.log('Commands copied to clipboard');
+      const toastElement = document.getElementById('test-copy');
+      const toast = new bootstrap.Toast(toastElement);
+      toast.show();
+    }).catch((error) => {
+      console.error('Error copying commands to clipboard:', error);
+    });
+  }
   
 </script>
 {% endblock javascripts %}

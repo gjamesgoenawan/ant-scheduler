@@ -2,7 +2,6 @@ import ant
 import argparse
 
 if __name__ == "__main__":
-
     def split_ints(x):
         return [int(i) for i in x.split(',')]
 

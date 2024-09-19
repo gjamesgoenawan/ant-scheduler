@@ -1,8 +1,10 @@
+import os
 import sys
 import time
 import uuid
 import threading
-from flask import Flask, render_template, request, redirect, url_for, g
+import eventlet
+from flask import Flask, render_template, request, redirect, url_for, g, flash
 from flask_minify  import Minify
 from flask_socketio import SocketIO
 from typing import Optional, Any
@@ -10,10 +12,11 @@ from typing import Optional, Any
 from ant.visualizer import base_visualizer
 from ant.runner import base_runner
 from ant.logger import base_logger
-from ant.utils.misc import INF
+from ant.utils.misc import INF, join_command_list, parse_string
 
 # configure flask app
 app = Flask(__name__)
+app.config['SECRET_KEY'] = '901283901289089304859034890'
 socketio = SocketIO(app)
 Minify(app=app, html=True, js=True, cssless=True)
 data_lock = threading.Lock()
@@ -34,6 +37,13 @@ def find_task_by_task_id(dictionary, x, key='task_id'):
         if i[key] == x:
             return i
     return None
+
+# force https
+@app.before_request
+def redirect_to_https():
+    if request.scheme == 'http':
+        return redirect(request.url.replace("http://", "https://"))
+
 
 @app.route('/')
 def stats():
@@ -66,35 +76,77 @@ def completed_task():
 def create_task():
     if request.method == 'POST':
         global vis_data
-        task_id = request.form['task_id']
-        gpu_ids = request.form['n_gpus']
-        command = request.form['command']
-        new_task = {'ant_task_id': task_id, 'ant_n_gpus': gpu_ids, 'command': command, 'envar' : {}}
+        queue_mode = request.form['queue_mode']
+        if queue_mode == 'Single':
+            task_id = request.form['task_id']
+            gpu_ids = request.form['n_gpus']
+            command = request.form['command']
+            new_task = [{'ant_task_id': task_id, 'ant_n_gpus': gpu_ids, 'command': command, 'envar' : {}}]
+        
+        else:
+            command = request.form['command']
+            new_task = [parse_string(i) for i in join_command_list(command.strip().split('\n'))]
 
         runner_instruction = {'task_to_queue' : new_task}
         vis_data = g.runner.step(runner_instruction)
 
+        flash(['success', 'Task created successfully!'])        
         return redirect(url_for('create_task'))
     new_task_id = str(uuid.uuid4())
     return render_template('home/create_task.html', new_task_id=new_task_id, segment='create_task')
 
-@app.route('/delete_queued_task', methods=['POST'])
-def delete_queued_task():
+@app.route('/delete_queued_task/<task_id>') # change this to a redirect strategy
+def delete_queued_task(task_id):
     global vis_data
-    runner_instruction = {'queued_task_to_delete' : find_task_by_task_id(vis_data['runner_visualization']['task_status']['queued_tasks'], request.form['task_id'], key='ant_task_id')}
-    vis_data = g.runner.step(runner_instruction)
+    queued_task_to_delete = find_task_by_task_id(vis_data['runner_visualization']['task_status']['queued_tasks'], task_id, key='ant_task_id')
+    
+    if queued_task_to_delete is None:
+        flash(['alert', f'Queued Task {task_id} is not found!'])
+    else:
+        runner_instruction = {'queued_task_to_delete' : queued_task_to_delete}
+        vis_data = g.runner.step(runner_instruction)
+        flash(['info', f'Queued Task {task_id} deleted successfully!'])
+
     return redirect(url_for('create_task'))
 
-@app.route('/terminate_task', methods=['POST'])
-def terminate_task():
+@app.route('/terminate_task/<task_id>')
+def terminate_task(task_id):
     global vis_data
-    runner_instruction = {'task_to_terminate' : find_task_by_task_id(vis_data['runner_visualization']['task_status']['running_tasks'], request.form['task_id'], key='task_id')}
-    vis_data = g.runner.step(runner_instruction)
+    task_to_terminate = find_task_by_task_id(vis_data['runner_visualization']['task_status']['running_tasks'], task_id, key='task_id')
+    
+    if task_to_terminate is None:
+        flash(['alert', f'Task {task_id} is not found!'])
+    else:
+        runner_instruction = {'task_to_terminate' : task_to_terminate}
+        vis_data = g.runner.step(runner_instruction)
+        flash(['info', f'Task {task_id} terminated successfully!'])
     return redirect(url_for('ongoing_task'))
+
+@app.route('/view_log/<task_id>')
+def view_log(task_id):
+    log_dir = g.runner.handler.log_dir
+    if os.path.isfile(os.path.join(log_dir, f'{task_id}.log')) and '//' not in task_id:
+        with open(os.path.join(log_dir, f'{task_id}.log')) as f:
+            log_content = ''.join(f.readlines())
+        log_content = log_content.replace('\n', '<br>')
+    else:
+        log_content = 'file not found'
+    return(f'<pre>{log_content}</pre>')
 
 def run_flask_app(host='0.0.0.0', port=5000):
     threading.Thread(target=background_task, daemon=True).start()
-    socketio.run(app, debug=False, host=host, port=port)
+
+    # https start
+    listener = eventlet.listen((host, port))
+    ssl_args = {
+        'certfile': 'cert/cert.pem',
+        'keyfile': 'cert/key.pem'
+    }
+    listener = eventlet.wrap_ssl(listener, server_side=True, **ssl_args)
+    eventlet.wsgi.server(listener, app)
+
+    # http start - unused due to lacking copy to clipboard function
+    #socketio.run(app, debug=False, host=host, port=port, ssl_context=('cert/cert.pem', 'cert/key.pem'))
 
 class flask_visualizer(base_visualizer):
     def __init__(self, 

@@ -13,24 +13,34 @@
         <div class="card mb-4">
           <div class="card-body">
             <form role="form" class="text-start" action="{{ url_for('create_task') }}" method="POST">
-              <div class="input-group input-group-outline my-3 is-filled">
+
+              <div id='queue_mode_container' class="input-group input-group-outline my-3 is-filled">
+                <label class="form-label">Queue mode</label>
+                <select id="queue_mode" name="queue_mode" class="form-control" style="font-family: 'Courier New', Courier, monospace;" required>
+                  <option default>Single</option>
+                  <option>Multi</option>
+                </select>
+              </div>
+
+              <div id='task_id_container' class="input-group input-group-outline my-13 is-filled">
                 <label class="form-label">Task ID</label>
                 <input id="task_id" name="task_id" class="form-control" value="{{ new_task_id }}" required>
               </div>
             
-              <div class="input-group input-group-outline my-3 is-filled">
+              <div id='n_gpus_container' class="input-group input-group-outline my-3 is-filled">
                 <label class="form-label">Number of GPUs</label>
                 <select id="n_gpus" name="n_gpus" class="form-control" style="font-family: 'Courier New', Courier, monospace;" required>
                 </select>
               </div>
     
-              <div class="input-group input-group-outline mb-3">
+              <div id='command_container' class="input-group input-group-outline mb-3">
                 <label class="form-label">Commands</label>
                 <textarea id="command" name="command" class="form-control" rows="5" style="font-family: 'Courier New', Courier, monospace;" required></textarea>
               </div>
     
               <div class="text-center">
-                <button type="submit" class="btn bg-gradient-primary w-100 my-4 mb-2">Submit</button>
+                <button type="submit" class="btn bg-gradient-primary w-100 my-4 mb-2" data-target="successToast">Submit
+                </button>
               </div>
             </form>
           </div>
@@ -44,22 +54,6 @@
             <ul class="list-group" id="queued_tasks">
               
             </ul>
-          </div>
-        </div>
-      </div>
-
-
-      <div class="position-fixed bottom-1 end-1 z-index-2">
-        <div class="toast fade hide p-2 bg-white" role="alert" aria-live="assertive" id="successToast" aria-atomic="true">
-          <div class="toast-header border-0">
-            <i class="material-icons text-success me-2">check</i>
-            <span class="me-auto font-weight-bold">Material Dashboard </span>
-            <small class="text-body">11 mins ago</small>
-            <i class="fas fa-times text-md ms-3 cursor-pointer" data-bs-dismiss="toast" aria-label="Close"></i>
-          </div>
-          <hr class="horizontal dark m-0">
-          <div class="toast-body">
-            Hello, world! This is a notification message.
           </div>
         </div>
       </div>
@@ -97,10 +91,7 @@
                       <span class="text-xs">Envar: <span class="text-dark ms-sm-2 font-weight-bold">None</span></span>
                     </div>
                     <div class="ms-auto text-end">
-                      <form action="{{ url_for('delete_queued_task') }}" method="post" style="text-align: right;">
-                          <input type="hidden" name="task_id" value="${visData.runner_visualization.task_status.queued_tasks[idx].ant_task_id}">
-                          <button type="submit" class="btn btn-danger">Delete</button>
-                      </form>
+                      <button class="btn btn-danger" onclick="location.href='/delete_queued_task/${visData.runner_visualization.task_status.queued_tasks[idx].ant_task_id}'">Terminate</button>
                     </div>
                    </li>`
     }
@@ -118,6 +109,18 @@
       }
   });
 
-  
+  const queueModeSelect = document.getElementById('queue_mode');
+  const taskIdInput = document.getElementById('task_id_container');
+  const nGpusInput = document.getElementById('n_gpus_container');
+
+  queueModeSelect.addEventListener('change', () => {
+    if (queueModeSelect.value === 'Multi') {
+      taskIdInput.style.display = 'none';
+      nGpusInput.style.display = 'none';
+    } else {
+      taskIdInput.style.display = 'flex';
+      nGpusInput.style.display = 'flex';
+    }
+  });
 </script>
 {% endblock javascripts %}

@@ -1,20 +1,33 @@
-      <!-- <footer class="footer pt-5">
-        <div class="container-fluid">
-          <div class="row align-items-center justify-content-lg-between">
-            <div class="col-lg-6 mb-lg-0 mb-4">
-              <div class="copyright text-center text-sm text-muted text-lg-start">
-                &copy; <a href="https://github.com/gjamesgoenawan" class="font-weight-bold" target="_blank">ANT Scheduler</a>
-              </div>
-            </div>
-            <div class="col-lg-6">
-              <ul class="nav nav-footer justify-content-center justify-content-lg-end">
-                <li class="nav-item">
-                  <a href="https://github.com/gjamesgoenawan" 
-                     class="nav-link text-muted" target="_blank">Github</a>
-                </li>
-              </ul>
-            </div>
+<div class="position-fixed bottom-1 end-1 z-index-2">
+  {% with messages = get_flashed_messages() %}
+  {% if messages %}
+    {% for message in messages %}
+      {% if message[0] == 'success' %}
+        <div class="toast toast-startfrombegining fade hide p-2 bg-white mb-3" role="alert" aria-live="assertive" aria-atomic="true">
+          <div class="toast-header border-0">
+            <i class="material-icons text-success me-2">check</i>
+            <span class="me-auto font-weight-bold">{{ message[1] }}</span>
           </div>
         </div>
-      </footer> -->
+      {% endif %}
+      {% if message[0] == 'alert' %}
+        <div class="toast toast-startfrombegining hide p-2 mt-2 bg-white" role="alert" aria-live="assertive" aria-atomic="true">
+          <div class="toast-header border-0">
+            <i class="material-icons text-danger me-2">campaign</i>
+            <span class="me-auto text-gradient text-danger font-weight-bold">{{ message[1] }}</span>
+          </div>
+        </div>
+      {% endif %}
+      {% if message[0] == 'info' %}
+        <div class="toast toast-startfrombegining fade hide p-2 mt-2 bg-gradient-info" role="alert" aria-live="assertive" aria-atomic="true">
+          <div class="toast-header bg-transparent border-0">
+            <i class="material-icons text-white me-2">notifications</i>
+            <span class="me-auto text-white font-weight-bold">{{ message[1] }}</span>
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+  {% endwith %}
+</div>
 

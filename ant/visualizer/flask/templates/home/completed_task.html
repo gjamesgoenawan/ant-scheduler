@@ -10,9 +10,17 @@
     <div class="container-fluid py-4">
       <div id="completed_task">
       </div>
-
-      {% include 'includes/footer.html' %}
+      <div class="position-fixed bottom-1 end-1 z-index-2">
+        <div class="toast fade hide p-2 bg-white mb-3" id="test-copy">
+          <div class="toast-header border-0">
+            <i class="material-icons text-success me-2">check</i>
+            <span class="me-auto font-weight-bold">Commands Copied Successfully!</span>
+          </div>
+        </div>  
+      </div>      
     </div>
+
+      {% include 'includes/footer.html' %}    
 
 {% endblock content %}
 
@@ -36,16 +44,24 @@
       currentHtml += `<div class="row">
           <div class="card mb-4">
             <div class="card-header pb-0">
-              <h4>${visData.runner_visualization.task_status.completed_tasks[idx].task_id}</h4>
+              <h4>
+                ${visData.runner_visualization.task_status.completed_tasks[idx].task_id}
+              </h4>
             </div>
             <div class="card-body">
               <ul class="list-group">
                 <li class="list-group-item border-0 ps-0 pt-0 text-sm"><strong class="text-dark">Status :</strong> &nbsp; ${terminatedStatus} </li>
                 <li class="list-group-item border-0 ps-0 pt-0 text-sm"><strong class="text-dark">Start Time :</strong> &nbsp; ${visData.runner_visualization.task_status.completed_tasks[idx].start_time_readable} </li>
                 <li class="list-group-item border-0 ps-0 pt-0 text-sm"><strong class="text-dark">Time Taken :</strong> &nbsp; ${visData.runner_visualization.task_status.completed_tasks[idx].total_time}  </li>
-                <li class="list-group-item border-0 ps-0 pt-0 text-sm"><strong class="text-dark">GPU IDs :</strong> &nbsp; ${visData.runner_visualization.task_status.completed_tasks[idx].gpu_ids} </li>
-                <li class="list-group-item border-0 ps-0 pt-0 text-sm"><strong class="text-dark">Command :</strong> &nbsp; ${visData.runner_visualization.task_status.completed_tasks[idx].command} </li>
+                <li class="list-group-item border-0 ps-0 pt-0 text-sm"><strong class="text-dark">GPU IDs :</strong> &nbsp; ${visData.runner_visualization.task_status.completed_tasks[idx].gpu_ids}</li>
+                <li class="list-group-item border-0 ps-0 pt-0 text-sm"><strong class="text-dark">Command :</strong> &nbsp; <span id='command_text_${idx}'>${visData.runner_visualization.task_status.completed_tasks[idx].command}</span></li>
+                <div> 
+                </div>
               </ul>
+              <div class='text-end'>
+                <button class="btn btn-link text-dark px-3 py-0 mb-0" onclick="copyCommandToClipboard('command_text_${idx}')"><i class="material-icons text-m me-2">copy</i></button>
+                <button class="btn btn-link text-dark px-3 py-0 mb-0" onclick="window.open('/view_log/${visData.runner_visualization.task_status.completed_tasks[idx].task_id}', '_blank')"><i class="material-icons text-m me-2">open_in_new</i></button> 
+              </div>
             </div>
           </div>
         </div>`
@@ -58,5 +74,18 @@
         updateCompletedTask(visData_local);
         
   });
+
+  function copyCommandToClipboard(element_id) {
+    const commandText = document.getElementById(element_id).textContent;
+    const commands = commandText.split(';').slice(1).join(';').slice(1);
+    navigator.clipboard.writeText(commands).then(() => {
+      console.log('Commands copied to clipboard');
+      const toastElement = document.getElementById('test-copy');
+      const toast = new bootstrap.Toast(toastElement);
+      toast.show();
+    }).catch((error) => {
+      console.error('Error copying commands to clipboard:', error);
+    });
+  }
 </script>
 {% endblock javascripts %}

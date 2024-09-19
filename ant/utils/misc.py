@@ -1,4 +1,7 @@
 import os
+import re
+import uuid
+import random
 from typing import List
 
 INF = 99999999999999
@@ -87,3 +90,77 @@ def format_timedelta(td):
 
     readable_format = ', '.join(parts)
     return readable_format
+
+def join_command_list(command_list):
+    '''
+    Join a list of commands.
+    Addresses the usage of '\' to seperate line within a single command.
+    '''
+    joint_command_list = []
+
+    temp_command = ''
+    for idx in range(len(command_list)):
+        curr_command = command_list[idx].strip()
+        if curr_command == '':
+            continue
+        if curr_command[-1:] == '\\':
+            temp_command += curr_command[:-1].strip()
+            temp_command += " "
+        else:
+            temp_command += curr_command
+            joint_command_list.append(temp_command)
+            temp_command = ''
+    return joint_command_list
+
+def parse_string(s):
+    '''
+    Command Argument Parser.
+
+    Parsing 2 arguments for ANT-Runner:
+        ant_n_gpus=int
+        ant_task_id=str
+    '''
+    
+    # random {rand int|float num1 num2}
+    random_entry = re.findall('{rand (int|float) ([+-]?[0-9]*\.?[0-9]+) ([+-]?[0-9]*\.?[0-9]+)}', s)
+    _s = re.sub('{rand (int|float) ([+-]?[0-9]*\.?[0-9]+) ([+-]?[0-9]*\.?[0-9]+)}', '{}', s)
+    random_results = []
+    for i in random_entry:
+        if i[0].lower() == 'int':
+            random_results.append(random.randrange(int(i[1]), int(i[2])))
+            
+        elif i[0].lower() == 'float':
+            random_results.append(random.uniform(float(i[1]), float(i[2])))
+        else:
+            raise NotImplementedError(f"Not understood : {i}")
+    s = _s.format(*random_results).strip()
+
+    # ant arguments
+    # gpu
+    ant_n_gpus = re.findall('ant_n_gpus=([0-9]+)', s)
+    if len(ant_n_gpus) < 1: 
+        # self.logger.warn("Number of GPU isn't specified, setting to default value")
+        n_gpus = 1
+    else:
+        n_gpus = int(ant_n_gpus[-1])
+    _s = re.sub('ant_n_gpus=([0-9]+)', '', s)
+    s = _s.strip()
+
+    # task_id
+    pattern = r'ant_task_id=([^\s"]+|"[^"]*")'
+    ant_task_id = re.findall(pattern, s)
+
+    if len(ant_task_id) < 1: 
+        # self.logger.warn("Number of GPU isn't specified, setting to default value")
+        task_id = str(uuid.uuid4())
+    else:
+        task_id = ant_task_id[-1]
+        if task_id.startswith('"') and task_id.endswith('"'):
+            task_id = task_id[1:-1]
+    _s = re.sub(pattern, '', s)
+    s = _s.strip()
+    
+    return {'command' : s,
+            'ant_n_gpus' : n_gpus,
+            'ant_task_id' : task_id,
+            'envar' : {}}
