@@ -164,3 +164,25 @@ def parse_string(s):
             'ant_n_gpus' : n_gpus,
             'ant_task_id' : task_id,
             'envar' : {}}
+
+def parse_and_truncate_file(filename : str, max_lines : int, line_break : str = '\n'):
+    """
+    Read logs and truncate middle part.
+    """
+    if os.path.isfile(filename):
+        with open(filename) as f:
+            data = f.readlines()
+        
+        all_lines = []
+        for x in data:
+            all_lines += x.strip().split('\n')
+
+        if len(all_lines) > max_lines:
+            all_lines = all_lines[:int(max_lines/2)] + ["", "", "============================", f"{len(all_lines)-max_lines} hidden lines ...", "============================", "", ""] + all_lines[-int(max_lines/2):]
+
+        rendered_lines = ''
+        for x in all_lines:
+            rendered_lines += (x + line_break)
+        return rendered_lines
+    else:
+        return 'file not found'
