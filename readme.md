@@ -133,24 +133,11 @@ Enable this behavior by setting `ADGS_enabled=true` in your config. This feature
 ## Changelog:
 | Version | Changelogs |
 | -       | -          |
-| 1.0.0 (Current) | a lot |
+| 1.0.0 (Current) | - Massive rewrite.<br>- Switched to react.js frontend.<br>- Reimplement backend as a REST API & improved stability.<br>- Added GPU Toggle to disable specific GPUs.<br>- Added Environment Variable editor & its custom functions.<br>- Added `monitor` component that polls hardware info & status in an async manner. Deprecated `sysinfo.py`<br>- Added `AntTask` structure for tasks to allow seamless and integrated properties tracking (time taken, envar, etc).<br>- Added launcher `run.py` to launch & restart frontend & backend.<br>- Redesigned `Completed Task` page. Its actually practical now.<br>- Fixed random bugs & added more safeguards (removing illegal characters in `task_id`, rejecting duplicate `task_id`, etc)<br>- Bunch of new QoL (more detailed message in toasts, etc.) |
 |0.3.1 | - Now host HTTP and HTTPS server with proper redirecting. <br> - Deprecated `port` argument & replaced it with `port_http` & `port_https` <br> - Implemented faster log truncation algorithm to prevent unresponsive webserver. |
 |0.3| - Added Auto GPU Availability Detection<br>- Added Mutliple Command Support<br>- Added QOL features to Flask UI (better notification, copy commands, view logs in browser, etc.)<br>- Forced HTTPS |
 |0.2| - Updated Flask Visualizer UI <br> - Added advanced sytem monitoring (graphs & statistics)<br>- Set `ant.handler.subprocess_handler` as default.<br>- Deprecated `ant.handler.tmux_handler`<br>- Deprecated `ant.visualizer.ncurse_visualizer`|
 |0.1| - Initial release|
-
-
-- Massive rewrite.
-- Switched to react.js frontend.
-- Reimplement backend as a REST API & improved stability.
-- Added GPU Toggle to disable specific GPUs.
-- Added Environment Variable editor & its custom functions.
-- Added `monitor` component that polls hardware info & status in an async manner. Deprecated `sysinfo.py`
-- Added `AntTask` structure for tasks to allow seamless and integrated properties tracking (time taken, envar, etc).
-- Added launcher `run.py` to launch & restart frontend & backend.
-- Redesigned `Completed Task` page. Its actually practical now.
-- fixed random bugs & added more safeguards (removing illegal characters in `task_id`, rejecting duplicate `task_id`, etc)
-- Bunch of new QoL (more detailed message in toasts, etc.)
 
 ## Acknowledgement
 Web Template: [Creative Tim](https://www.creative-tim.com/product/material-dashboard).
