@@ -67,7 +67,7 @@ export default function OngoingTasks() {
 
   return (
     <Layout pageTitle="Ongoing Task">
-      <div className="container-fluid py-4">
+      <div className="container-fluid py-2">
         {confirmTaskId && (
           <div
             className="confirm-modal"

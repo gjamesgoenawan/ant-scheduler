@@ -21,17 +21,14 @@ conda create --name ant2 python=3.11 -y
 conda activate ant2
 pip install -r requirements.txt
 
-# # Optional : development purposes
-# conda install conda-forge::nodejs==20.19.4 -y
-# cd src/frontend/ && npm install && cd ../../
-
-# # Rebuild frontend after modification
-# cd src/frontend/ && npm install && npm run build && cd ../../
+# Build frontend
+# conda install conda-forge::nodejs==24.4.1 -y
+cd src/frontend/ && npm install && npm run build && cd ../../
 ```
 
 Next, generate a certificate for HTTPS support:
 ```
-mkdir cert  && cd cert && openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=ant-runner" && cd ..
+mkdir cert  && cd cert && openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=ant-scheduler" && cd ..
 ```
 
 ### Launching
@@ -133,7 +130,7 @@ Enable this behavior by setting `ADGS_enabled=true` in your config. This feature
 ## Changelog:
 | Version | Changelogs |
 | -       | -          |
-| 1.0.0 (Current) | - Massive rewrite.<br>- Switched to react.js frontend.<br>- Reimplement backend as a REST API & improved stability.<br>- Added GPU Toggle to disable specific GPUs.<br>- Added Environment Variable editor & its custom functions.<br>- Added `monitor` component that polls hardware info & status in an async manner. Deprecated `sysinfo.py`<br>- Added `AntTask` structure for tasks to allow seamless and integrated properties tracking (time taken, envar, etc).<br>- Added launcher `run.py` to launch & restart frontend & backend.<br>- Redesigned `Completed Task` page. Its actually practical now.<br>- Fixed random bugs & added more safeguards (removing illegal characters in `task_id`, rejecting duplicate `task_id`, etc)<br>- Bunch of new QoL (more detailed message in toasts, etc.) |
+| 1.0.0 (Current) | - Massive rewrite.<br>- Switched to react.js frontend.<br>- Reimplement backend as a REST API & improved stability.<br>- Added GPU Toggle to disable specific GPUs.<br>- Added Environment Variable editor & its custom functions.<br>- Added `monitor` component that polls hardware info & status in an async manner. Deprecated `sysinfo.py`<br>- Added `AntTask` structure for tasks allowing seamless and integrated property tracking (time taken, envar, etc).<br>- Added launcher `run.py` to start & restart frontend & backend.<br>- Redesigned `Completed Task` page. It's actually practical now.<br>- fixed random bugs & added more safeguards (e.g. removing illegal characters in `task_id`, rejecting duplicate `task_id`, etc)<br>- Bunch of new QoL (e.g. more detailed message in toasts, etc.) |
 |0.3.1 | - Now host HTTP and HTTPS server with proper redirecting. <br> - Deprecated `port` argument & replaced it with `port_http` & `port_https` <br> - Implemented faster log truncation algorithm to prevent unresponsive webserver. |
 |0.3| - Added Auto GPU Availability Detection<br>- Added Mutliple Command Support<br>- Added QOL features to Flask UI (better notification, copy commands, view logs in browser, etc.)<br>- Forced HTTPS |
 |0.2| - Updated Flask Visualizer UI <br> - Added advanced sytem monitoring (graphs & statistics)<br>- Set `ant.handler.subprocess_handler` as default.<br>- Deprecated `ant.handler.tmux_handler`<br>- Deprecated `ant.visualizer.ncurse_visualizer`|

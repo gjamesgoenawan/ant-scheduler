@@ -10,7 +10,7 @@
 
     "RUNNER_default_n_gpus" : 0,
 
-    "LOGGER_log_dir": "./ant2_logs",
+    "LOGGER_log_dir": "./ant_runner_logs",
     "LOGGER_log_to_file": true,
     "LOGGER_log_to_stdout": true,
     "LOGGER_level": 0,
