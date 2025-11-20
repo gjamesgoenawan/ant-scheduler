@@ -1,0 +1,222 @@
+import datetime
+import functools
+import os
+from typing import List
+
+INF = float('inf')
+
+def list2str(x : List, newline : bool = False):
+    if isinstance(x, str):
+        return x
+    
+    output = ''
+    for idx, i in enumerate(x):
+        if idx == 0:
+            output += str(i)
+        else:
+            output += f',{i}'
+        if newline:
+            output += '\n'
+    return output
+
+def parse_envar(x):
+    """will always return ' blablabal'"""
+    output = ' '
+    for i in x.keys():
+        output += f"{i}={x[i]} "
+    if len(output) > 1:
+        output = output[:-1]
+    return output
+
+def read_last_n_lines(filename, n=1):
+    """Returns the last n lines of a file (n=1 gives the last line)."""
+    with open(filename, 'rb') as f:
+        # Move the cursor to the end of the file
+        f.seek(0, os.SEEK_END)
+        position = f.tell()
+        buffer = bytearray()
+
+        # offset
+        n += 1
+        
+        while n > 0 and position > 0:
+            try:
+                f.seek(position - 1)
+                byte = f.read(1)
+                position -= 1
+                if byte == b'\n':
+                    n -= 1
+                    if n == 0:
+                        break
+                buffer.extend(byte)
+            except OSError:
+                f.seek(0)
+                break
+
+        # Add the first line if we reached the beginning of the file
+        if position == 0:
+            f.seek(0)
+            buffer.extend(f.read(1))
+        
+        buffer.reverse()
+        last_n_lines = buffer.decode(errors='ignore').splitlines()
+    return last_n_lines
+
+def wrap_text(content, max_width, max_height, text_wrap):
+    if text_wrap.lower() == 'wrap':
+        wrapped_lines = []
+        for line in content:
+            while len(line) > (max_width - 4):
+                wrapped_lines.append(line[:max_width])
+                line = line[max_width - 4:]
+            wrapped_lines.append(line)
+
+        wrapped_lines = wrapped_lines[-(max_height + 1):]
+    
+    elif text_wrap.lower() == 'no-wrap':
+        wrapped_lines = [i.strip() for i in content[-(max_height + 1):]]
+    else:
+        wrapped_lines = ""
+    return wrapped_lines
+
+def format_timedelta(td):
+    if isinstance(td, int) or isinstance(td, float):
+        td = datetime.timedelta(seconds=round(td))
+    days = td.days
+    hours, remainder = divmod(td.seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+
+    parts = []
+    if days > 0:
+        parts.append(f"{days} days")
+    if hours > 0:
+        parts.append(f"{hours} hours")
+    if minutes > 0:
+        parts.append(f"{minutes} minutes")
+    # if seconds > 0:
+    parts.append(f"{seconds} seconds")
+
+    readable_format = ', '.join(parts)
+    return readable_format
+
+def format_timestamp(t):
+    dt = datetime.datetime.fromtimestamp(t)
+    return dt.strftime('%H:%M:%S %d-%m-%Y')
+
+def split_commands(command: str):
+    """
+    Splits a multiline shell command string into separate executable commands.
+    Handles line continuations, comments, and operators like &&, ||, ;.
+    """
+    # Step 1: remove comments and handle line continuations
+    lines = command.splitlines()
+    current = ""
+    cleaned_lines = []
+
+    for line in lines:
+        # remove comment
+        if line.find('#') != -1:
+            line = line[:line.find('#')]
+        line = line.strip()
+
+        if line.strip() == '':
+            continue
+        
+        # Remove trailing backslash
+        if line.endswith("\\"):
+            line = line[:-1].strip()
+            current += line + " "
+        else:
+            current += line
+            cleaned_lines.append(current)
+            current = ""
+    return cleaned_lines
+
+def parse_and_truncate_file(filename : str, max_lines : int, line_break : str = '\n'):
+    """
+    Read logs and truncate middle part.
+    """
+    with open(filename) as f:
+        data = f.readlines()
+    
+    all_lines = []
+    for x in data:
+        all_lines += x.strip().split('\n')
+
+    if len(all_lines) > max_lines:
+        all_lines = all_lines[:int(max_lines/2)] + ["", "", "============================", f"{len(all_lines)-max_lines} hidden lines ...", "============================", "", ""] + all_lines[-int(max_lines/2):]
+
+    rendered_lines = ''
+    for x in all_lines:
+        rendered_lines += (x + line_break)
+    return rendered_lines
+
+def handle_singular_or_plural(func):
+    """
+    func wrapper to support singular values for plural functions.
+    """
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        is_singular = False
+        new_args = []
+        for i in args:
+            if not isinstance(i, list):
+                new_args.append([i])
+                is_singular = True
+            else:
+                new_args.append(i)
+        for k in kwargs:
+            if not isinstance(kwargs[k], list):
+                kwargs[k] = [kwargs[k]]
+                is_singular = True
+        result = func(self, *new_args, **kwargs)
+        
+        if result is None:
+            return result
+        
+        if is_singular:
+            return result[0]
+        
+        return result
+    return wrapper
+
+def sanitize_task_id(task_id): 
+    replacements = {' ': '-',
+                    '+': '-plus-',
+                    '&': '-and-'}
+    for k,v in replacements.items():
+        task_id = task_id.replace(k,v)
+    return task_id
+
+class Smoother:
+    def __init__(self, alpha: float, 
+                 init_value: float = 0.0,
+                 max_length: int = 300,
+                 decimal_points: int = 1):
+        """
+        Exponential Moving Average (EMA) smoother.
+        
+        Parameters:
+            alpha (float): smoothing factor (0 < alpha <= 1). 
+                           Higher = more reactive to new values.
+            init_value (float): initial smoothed value.
+        """
+        if not (0 < alpha <= 1):
+            raise ValueError("alpha must be in (0, 1].")
+        self.decimal_points = decimal_points
+        self.alpha = alpha
+        self.data = [round(init_value, self.decimal_points)] * max_length
+        self.value = init_value
+
+    def update(self, new_value: float) -> float:
+        """
+        Update with a new value and return the smoothed result.
+        """
+        self.value = round(self.alpha * new_value + (1 - self.alpha) * self.value, self.decimal_points)
+        self.data = self.data[1:] + [self.value]
+
+    def get(self) -> float:
+        """
+        Get the current smoothed value.
+        """
+        return self.data

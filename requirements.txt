@@ -1,5 +1,23 @@
-eventlet==0.36.1
-flask_socketio==5.3.6
-flask_minify==0.48
+# core
 psutil==6.0.0
+nvidia-ml-py3==7.352.0
+email_validator>=2.0.0
+importlib-metadata==8.7.0
+pygments>=2.4.0
 py-cpuinfo==9.0.0
+
+# backend hosting
+eventlet==0.40.3
+requests==2.32.5
+Werkzeug<3.1
+flask-cors==6.0.1
+Flask==3.0.0
+Flask-Compress==1.18
+Flask-Minify==0.48
+Flask-SocketIO==5.3.6
+
+# frontend hosting
+hypercorn==0.17.3
+quart==0.20.0
+httpx==0.28.1
+websockets==15.0.1
