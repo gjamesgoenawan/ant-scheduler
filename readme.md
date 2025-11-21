@@ -17,19 +17,12 @@ ANT is built and tested with the following dependencies:
 ### Installing
 Assuming you have a conda installation, the necessary environment can be created by running:
 ```
-conda create --name ant2 python=3.11 -y
+conda create -n ant2 python=3.11 conda-forge::nodejs==24.4.1 -y
 conda activate ant2
 pip install -r requirements.txt
-
-# Build frontend
-# conda install conda-forge::nodejs==24.4.1 -y
-cd src/frontend/ && npm install && npm run build && cd ../../
+bash setup.sh
 ```
-
-Next, generate a certificate for HTTPS support:
-```
-mkdir cert  && cd cert && openssl req -x509 -newkey rsa:4096 -keyout key.pem -out cert.pem -days 365 -nodes -subj "/CN=ant-scheduler" && cd ..
-```
+`setup.sh` will build the frontend and generate necessary certificates.
 
 ### Launching
 Finally, launch ANT using:
