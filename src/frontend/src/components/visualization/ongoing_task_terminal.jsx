@@ -57,7 +57,7 @@ export default function OngoingTaskTerminal({
           <ul className="list-group">
             <li className="list-group-item border-0 ps-0 pt-0 text-sm">
               <strong className="text-dark">Status :</strong>{" "}
-              <span className="badge badge-sm bg-gradient-danger">
+              <span className="badge badge-sm bg-gradient-info">
                 Running
               </span>
             </li>

@@ -12,12 +12,12 @@ class AntTask():
     def __init__(self,
                  command,
                  task_id: Optional[str] = None,
-                 envar: Dict[str, str] = {},
-                 runner_envar: Dict[str, str] = {}, # similar to envar, but hidden.
+                 envar: Optional[Dict[str, str]] = None,
+                 runner_envar: Optional[Dict[str, str]] = None, # similar to envar, but hidden.
                  **kwargs):
         self.task_id = task_id if (task_id is not None and task_id != '') else str(uuid.uuid4())
-        self.envar = envar
-        self.runner_envar = runner_envar
+        self.envar = envar if envar is not None else {}
+        self.runner_envar = runner_envar if runner_envar is not None else {}
         self.terminated = False 
         
         # validation and sanitation
