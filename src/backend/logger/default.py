@@ -25,7 +25,7 @@ def setup_logger(name : str, level : int = 20, filename : Optional[str] = None, 
     return logger
 
 class default_logger(base_logger):
-    def __init__(self, opt): # loader, handler, runner, visualizer, log_dir: Optional = None, log_to_file : bool = False, stream : bool = True, level : int = 0):
+    def __init__(self, opt):
         self.opt = opt
         loader = self.opt.get('loader')
         handler = self.opt.get('handler')
@@ -33,7 +33,7 @@ class default_logger(base_logger):
         visualizer = self.opt.get('visualizer')
 
         log_dir = self.opt.get('LOGGER_log_dir', os.path.join(os.getcwd(), "ant_runner_logs"))
-        self.log_dir = os.path.join(log_dir, time.strftime("%d_%M_%Y_%H_%M_%S"))
+        self.log_dir = os.path.join(log_dir, time.strftime("%d_%m_%Y_%H_%M_%S"))
         self.log_to_file = self.opt.get('LOGGER_log_to_file', True)
         self.log_to_stdout = self.opt.get('LOGGER_log_to_stdout', True)
         self.level = self.opt.get('LOGGER_level', True)
