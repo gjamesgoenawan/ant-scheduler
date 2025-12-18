@@ -1,8 +1,15 @@
 import React, { useEffect, useState } from "react";
 import Layout, { useToast } from "../components/layout/layout";
 import { useMonitorData, API_URL } from "../App";
+import {
+  copyCommand,
+  downloadLog,
+  deleteTask,
+  restartTask,
+} from "../utils/taskActions";
 
-const TaskRow = ({ task, isLast, onCopy, onDelete, onDownload }) => {
+
+const TaskRow = ({ task, isLast, onCopy, onRestart, onDelete, onDownload }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const statusSquare = (
     <div
@@ -46,10 +53,22 @@ const TaskRow = ({ task, isLast, onCopy, onDelete, onDownload }) => {
 
              <button
               className="btn btn-link text-dark p-2 mb-0"
-              onClick={() => onCopy(task.command)}
+              onClick={() =>
+                onCopy(task)
+              }
               title="Copy Command"
             >
               <i className="material-icons text-lg">copy</i>
+            </button>
+
+            <button
+              className="btn btn-link text-dark p-2 mb-0"
+              onClick={() =>
+                onRestart(task)
+              }
+              title="Restart Task"
+            >
+              <i className="material-icons text-lg">restart_alt</i>
             </button>
 
             <button
@@ -138,113 +157,6 @@ export default function CompletedTasks() {
     }
   }, [data]);
 
-
-  const handleCopyCommand = (command) => {
-    navigator.clipboard.writeText(command).then(() => {
-      addToast({
-        type: "success",
-        title: "Command Copied!",
-        autohide: true,
-        delay: 2000,
-      });
-    });
-  };
-
-  const handleDeleteTask = async (task) => {
-    if (!window.confirm(`Are you sure you want to delete task ${task.task_id}?`)) return;
-    
-    try {
-      const response = await fetch(`${API_URL}/remove_task_from_history`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task_ids: task.task_id }),
-      });
-
-      if (!response.ok) {
-        const msg = await response.text();
-        addToast({
-          type: "error",
-          title: "Delete Failed",
-          message: msg,
-          autohide: true,
-          delay: 3000,
-        });
-      } else {
-        addToast({
-          type: "info",
-          title: "Task Removed",
-          message: `Task ${task.task_id} removed from history`,
-          autohide: true,
-          delay: 2000,
-        });
-      }
-    } catch (err) {
-      addToast({
-        type: "error",
-        title: "Error",
-        message: String(err),
-        autohide: true,
-        delay: 3000,
-      });
-    }
-  };
-
-  const handleDownloadLog = async (task) => {
-    try {
-      const response = await fetch(
-        `${API_URL}/get_log_file?task_id=${task.task_id}`,
-        {
-          method: "GET",
-          headers: { "Content-Type": "application/json" },
-        }
-      );
-
-      const contentType = response.headers.get("Content-Type") || "";
-
-      if (!response.ok || contentType.includes("json")) {
-        const errData = await response.json().catch(() => ({}));
-        const msg = errData.message || "Failed to download log file";
-
-        addToast({
-          type: "error",
-          title: "Download Failed",
-          message: msg,
-          autohide: true,
-          delay: 3000,
-        });
-        return;
-      }
-
-      const blob = await response.blob();
-      const contentDisposition = response.headers.get("Content-Disposition");
-      let fileName = `${task.task_id}.ant.log`;
-
-      if (contentDisposition) {
-        const fileNameMatch = contentDisposition.match(/filename="(.+)"/);
-        if (fileNameMatch?.[1]) {
-          fileName = fileNameMatch[1];
-        }
-      }
-
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = fileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (err) {
-      addToast({
-        type: "error",
-        title: "Error",
-        message: String(err),
-        autohide: true,
-        delay: 3000,
-      });
-    }
-  };
-
   return (
     <Layout pageTitle="Completed Tasks">
       <div className="container-fluid py-2">
@@ -270,9 +182,10 @@ export default function CompletedTasks() {
                       key={task.task_id} 
                       task={task} 
                       isLast={idx === completedTasks.length - 1}
-                      onCopy={handleCopyCommand}
-                      onDelete={handleDeleteTask}
-                      onDownload={handleDownloadLog}
+                      onCopy={(task) => copyCommand(task, addToast)}
+                      onRestart={(task) => restartTask(task.task_id, addToast)}
+                      onDownload={(task) => downloadLog(task.task_id, addToast)}
+                      onDelete={(task) => deleteTask(task.task_id, addToast)}
                   />
                   ))
               )}

@@ -16,10 +16,12 @@ def split_ints(x):
 parser = argparse.ArgumentParser(description="Start ANT backend/frontend")
 parser.add_argument("gpu_ids", type=split_ints, help="GPU IDs to be utilized by ANT, separated by commas")
 parser.add_argument("--config", type=str, default="config/default.json", help="JSON config for ANT")
+parser.add_argument("--cert_path", type=str, default="./cert/", help="SSL Certificate Path")
 args, unknown_args = parser.parse_known_args()
 
 GPU_IDS = args.gpu_ids
 CONFIG = args.config
+CERT_PATH = args.cert_path
 
 with open(CONFIG, "r") as f:
     opt = json.load(f)
@@ -67,7 +69,8 @@ def stop_process(proc, name="Process"):
 def start_frontend():
     global FRONTEND_PROC
     frontend_args = ["python", "src/frontend/launch.py",
-                    "--config", CONFIG] + unknown_args
+                    "--config", CONFIG,
+                    "--cert_path", CERT_PATH] + unknown_args
     print(f"Starting frontend with args: {frontend_args}")
     FRONTEND_PROC = subprocess.Popen(frontend_args)
     print(f"Backend started with PID {FRONTEND_PROC.pid}")

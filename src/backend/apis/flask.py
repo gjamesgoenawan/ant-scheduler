@@ -151,6 +151,19 @@ def get_log_file():
         r.logger.error(f"logger log_dir isn't in the requested file. Might be a security concern. Requested: {filename}")
         return jsonify({"status": "error", "data": "logger log_dir isn't in the requested file."}), 400
 
+@app.route("/restart_task", methods=["GET"])
+def restart_task():
+    task_id = request.args.get("task_id")  # get from query string
+    if not task_id:
+        return jsonify({"status": "error", "message": "task_id is required"}), 400
+
+    result = r.restart_task(task_id)
+    
+    if result['status'] == 'success':
+        return jsonify(result), 200
+    else:
+        return jsonify(result), 400
+
 @app.route("/get_envar", methods=["GET"])
 def get_env():
     return jsonify(r.loader.get_envar())

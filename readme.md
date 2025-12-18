@@ -72,31 +72,8 @@ PORT={rand int 4000 5000} python myscript.py
 python myscript.py --seed {rand float 3.4 6.4}
 ```
 
-#### Special environment variable
-In previous versions of ant, commands can be very long and tedious to set up, hence we have integrated several special environment variables to improve QOL.
-
-| Variable | Goal | What it actually does| Defaults |
-| - | - | - | - |
-| `ant_wd` | set the working directory of the script | invoke `cd` before your command | `./` |
-| `ant_conda_env` | set / activate a conda environment | invoke `conda run` before your command | `None` |
-| `ant_conda_path` | change conda executable path | invoke the specified conda executable.  Should point to `your/path/bin/conda`| `conda` |
-
-
-Hence, instead of appending:
-```
-cd /my/work/dir && /home/anaconda/bin/conda run --live-stream -n my_env mycommand
-```
-You can simply use the following environment variable in the `Create New Task` page:
-| Variable | Value |
-| - | - |
-| `ant_wd` | `/my/work/dir` |
-| `ant_conda_env` | `my_env` |
-| `ant_conda_path` | `/home/anaconda/bin/conda` |
-
-Environment variables will be saved internally and applied to all commands if `Multi` Queue mode is selected.
-
 #### Queue Multiple Commands
-ANT also support queuing multiple commands. To achieve this, select the "Multi" queue mode in the `Create New Task` page. Multiple commands can be seperated using new lines & each command can be extended to the following lines by adding `\` at the end (just like you would on terminals).
+ANT also support queuing multiple commands. To achieve this, select the "Multi" queue mode in the `Create New Task` page. Multiple commands can be seperated using new lines & each command can be extended to the following lines by adding `\` at the end (just like you would on terminals). Lines with leading `#` will be ignored.  
 
 To configure running parameters, there two arguments can be used:
 `ant_n_gpus : int = 1` & `ant_task_id : str = uuid.uuid4()`
@@ -112,6 +89,30 @@ python thrid_task.py
 ```
 >Note that if multiple ANT arguments present, the only the last one will take effect. If none is present, the default value (randomized task_id & 0 n_gpus) will be used
 
+#### Special environment variable
+In previous versions of ant, commands can be very long and tedious to set up, hence we have integrated several special environment variables to improve QOL.
+
+| Variable | Goal | What it actually does| Defaults |
+| - | - | - | - |
+| `ant_task_id` | set task id | will override `Task ID` input in `Single` queue mode | `uuid.uuid4()` |
+| `ant_n_gpus` | set task id | will override `Number of GPUs` input in `Single` queue mode | 0 (can be adjusted in config) |
+| `ant_wd` | set the working directory of the script | invoke `cd` before your command | `./` |
+| `ant_conda_env` | set / activate a conda environment | invoke `conda run` before your command | `None` |
+| `ant_conda_path` | change conda executable path | invoke the specified conda executable.  Should point to `your/path/bin/conda`| `conda` |
+
+Hence, instead of appending:
+```
+cd /my/work/dir && /home/anaconda/bin/conda run --live-stream -n my_env mycommand
+```
+You can simply use the following environment variable in the `Create New Task` page:
+| Variable | Value |
+| - | - |
+| `ant_wd` | `/my/work/dir` |
+| `ant_conda_env` | `my_env` |
+| `ant_conda_path` | `/home/anaconda/bin/conda` |
+
+Environment variables will be saved internally and applied to all commands if `Multi` Queue mode is selected.
+
 #### [HIGHLY EXPERIMENTAL] Auto Detect GPU Status (ADGS)
 This feature monitors GPU usage and detects if a GPU is being utilized by processes outside of ANT. If the GPU's average usage or memory utilization exceeds 50% for a consecutive 20-second period, ANT will mark the GPU as BUSY.
 
@@ -123,6 +124,7 @@ Enable this behavior by setting `ADGS_enabled=true` in your config. This feature
 ## Changelog:
 | Version | Changelogs |
 | -       | -          |
+| 1.0.1 (Current) | - [new feature] Improved Copy Command. Now copied the properties as well, (n_gpus, task_id, envar)<br>- [new feature] Added task restart button.<br>- Patched directory traversal attack on `task_id`<br>- Fixed several frontend bugs (text-overflow and wrong error message)<br>- Frontend task actions (copy, delete, kill, etc) refactor and cleanup (toasts) |
 | 1.0.0 (Current) | - Massive rewrite.<br>- Switched to react.js frontend.<br>- Reimplement backend as a REST API & improved stability.<br>- Added GPU Toggle to disable specific GPUs.<br>- Added Environment Variable editor & its custom functions.<br>- Added `monitor` component that polls hardware info & status in an async manner. Deprecated `sysinfo.py`<br>- Added `AntTask` structure for tasks allowing seamless and integrated property tracking (time taken, envar, etc).<br>- Added launcher `run.py` to start & restart frontend & backend.<br>- Redesigned `Completed Task` page. It's actually practical now.<br>- fixed random bugs & added more safeguards (e.g. removing illegal characters in `task_id`, rejecting duplicate `task_id`, etc)<br>- Bunch of new QoL (e.g. more detailed message in toasts, etc.) |
 |0.3.1 | - Now host HTTP and HTTPS server with proper redirecting. <br> - Deprecated `port` argument & replaced it with `port_http` & `port_https` <br> - Implemented faster log truncation algorithm to prevent unresponsive webserver. |
 |0.3| - Added Auto GPU Availability Detection<br>- Added Mutliple Command Support<br>- Added QOL features to Flask UI (better notification, copy commands, view logs in browser, etc.)<br>- Forced HTTPS |

@@ -1,5 +1,7 @@
 import re
 import os
+import ast
+import copy
 import uuid
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -9,7 +11,7 @@ from logger import base_logger
 from monitor import ThreadedMonitor
 from utils.misc import (handle_singular_or_plural, list2str,
                         parse_and_truncate_file, split_commands,
-                        sanitize_task_id)
+                        sanitize_task_id, increment_task_id)
 from utils.structures import AntTask
 
 from . import base_runner
@@ -181,7 +183,7 @@ class gpu_runner(base_runner):
 
             else:
                 success.append(True)
-                message.append(f'Task Created! | {_t.task_id}')
+                message.append(f'Task {_t.task_id} Created!')
             current_queue_list.add(_t.task_id)
 
         if allow_partial:
@@ -486,7 +488,7 @@ class gpu_runner(base_runner):
     
     @staticmethod
     def parse_args(s) -> Tuple[Any, Any]:
-         # ant arguments
+        # ant arguments
         # gpu
         ant_n_gpus = re.findall('ant_n_gpus=([0-9]+)', s)
         if len(ant_n_gpus) < 1: 
@@ -508,7 +510,22 @@ class gpu_runner(base_runner):
                 task_id = task_id[1:-1]
         _s = re.sub(pattern, '', s)
         s = _s.strip()
-        return n_gpus, task_id, s
+
+        # envar
+        match = re.search(r'ant_envar\s*=\s*(\{.*?\})', s)
+        if match:
+            raw_dict = match.group(1)
+            try:
+                envar = ast.literal_eval(raw_dict)
+                if not isinstance(envar, dict):
+                    raise ValueError
+            except Exception as e:
+                raise ValueError(f"Failed to parse ant_envar: {e}")
+
+            s = s.replace(match.group(0), "").strip()
+        else:
+            envar = {}
+        return n_gpus, task_id, envar, s
 
     def create_task(self,
                     data: Dict[str, Any]):
@@ -551,11 +568,12 @@ class gpu_runner(base_runner):
                     n_gpus_from_envar = self.opt.get("RUNNER_default_n_gpus", 0)
                 
                 # try parsing gpu_runner-specific args from cmd
-                n_gpus_from_cmd, task_id_from_cmd, cleaned_c = self.parse_args(command)
+                n_gpus_from_cmd, task_id_from_cmd, envar_from_cmd, cleaned_c = self.parse_args(command)
+                envar.update(envar_from_cmd)
                 
                 # if args from cmd present, prioritize it.
-                n_gpus = n_gpus_from_envar if n_gpus_from_cmd is None else n_gpus_from_cmd
-                task_id = task_id_from_cmd if task_id_from_cmd is not None else task_id
+                data['n_gpus'] = n_gpus_from_cmd or n_gpus_from_envar or data.get('n_gpus', self.opt.get("RUNNER_default_n_gpus", 0))
+                task_id = task_id_from_cmd or task_id
 
                 # randomize uuid lmao
                 if task_id is None:
@@ -584,10 +602,11 @@ class gpu_runner(base_runner):
             
                 for c in split_commands(data['command']):
                     # try parsing gpu_runner-specific args from cmd
-                    n_gpus_from_cmd, task_id_from_cmd, cleaned_c = self.parse_args(c)
+                    n_gpus_from_cmd, task_id_from_cmd, envar_from_cmd, cleaned_c = self.parse_args(c)
 
                     # if args from cmd present, prioritize it.
                     n_gpus = n_gpus_from_envar if n_gpus_from_cmd is None else n_gpus_from_cmd
+                    envar.update(envar_from_cmd)
 
                     # randomize uuid lmao
                     if task_id_from_cmd is None:
@@ -613,4 +632,35 @@ class gpu_runner(base_runner):
             return {'status' : 'error',
                     'message' : [f'{e.__class__.__name__}: {"".join(e.args)}']}
 
+    def restart_task(self, task_id: str):
+        if task_id in self.task_id_history:
+            restarted_task = [copy.deepcopy(_t) for _t in self.task_completed if _t.task_id == task_id][0]
+        elif task_id in self.task_ongoing:
+            restarted_task = copy.deepcopy(self.task_ongoing[task_id])
+        else:
+            self.logger.error(f'Task ID {task_id} not found in either completed / ongoing tasks. Skipping')
+            return {'status': 'error',
+                    'message': f'Task ID {task_id} not found in either completed / ongoing tasks.'}
+
+        try:
+            # ensure the new task id is unique.
+            new_task_id = task_id
+            while True:
+                new_task_id = increment_task_id(new_task_id)
+                if new_task_id not in self.task_id_history and \
+                    new_task_id not in self.task_ongoing and \
+                    new_task_id not in [_k.task_id for _k in self.loader.get_queue()] :
+                    break
+            
+            restarted_task.task_id = new_task_id
+            restarted_task.reset()
+
+            # guaranteed to be true.
+            out = self.add_task_to_queue(task_to_queue=[restarted_task]) 
+            return {'status': 'success',
+                    'message': f'Task ID {new_task_id} Started!'}
         
+        except Exception as e:
+            self.logger.error(f'{e.__class__.__name__}: {"".join(e.args)}')
+            return {'status': 'error',
+                    'message' : [f'{e.__class__.__name__}: {"".join(e.args)}']}

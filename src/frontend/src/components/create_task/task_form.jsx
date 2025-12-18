@@ -58,19 +58,10 @@ function TaskForm({
         
         const msg =
           parsed?.message ??
-          parsed?.data ??
-          (await response.text().catch(() => "")) ??
-          "Failed to create task";
+          `Failed to create task with status ${response.status}`;
 
-        console.error("Failed to create task:", msg);
-
-        addToast({
-          type: "error",
-          title: `Error creating task(s)`,
-          message: msg || null,
-          autohide: true,
-          delay: 3000,
-        });
+        console.error("Failed to create task:", response);
+        throw new Error(msg);
       } else {
         const title =
           parsed?.message ??
@@ -81,7 +72,6 @@ function TaskForm({
         addToast({
           type: "success",
           title: title,
-          // message: msg,
           autohide: true,
           delay: 2000,
         });

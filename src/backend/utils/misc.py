@@ -1,6 +1,7 @@
+import os
+import re
 import datetime
 import functools
-import os
 from typing import List
 
 INF = float('inf')
@@ -183,10 +184,33 @@ def handle_singular_or_plural(func):
 def sanitize_task_id(task_id): 
     replacements = {' ': '-',
                     '+': '-plus-',
-                    '&': '-and-'}
+                    '&': '-and-',
+                    '/': '-slash-',
+                    '\\': '-backslash-'}
     for k,v in replacements.items():
         task_id = task_id.replace(k,v)
+    print(task_id)
     return task_id
+
+def ensure_string_literal(v: str):
+    if isinstance(v, str):
+        
+        if len(v)>=2 and v[0] == "\"" and v[-1] == "\"":
+            pass
+        elif len(v)>=2 and v[0] == "\'" and v[-1] == "\'":
+            v = f"\"{v[1:-1]}\""
+        else:
+            v = f"\"{v}\""
+    return v
+
+def increment_task_id(v: str):
+    match = re.match(r"(.*-restart-)(\d+)$", v)
+    
+    if match:
+        prefix, num = match.groups()
+        return f"{prefix}{int(num) + 1}"
+    else:
+        return f"{v}-restart-1"
 
 class Smoother:
     def __init__(self, alpha: float, 

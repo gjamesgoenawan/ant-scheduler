@@ -88,6 +88,11 @@ export function ToastProvider({ children, maxToasts = 2 }) {
             role="alert"
             aria-live="assertive"
             aria-atomic="true"
+            style={{
+              maxWidth: "350px",  
+              wordBreak: "break-word",
+              overflowWrap: "anywhere", 
+            }}
           >
             <div className={`toast-header border-0 ${t.type === "error" ? "bg-transparent text-white" : ""}`}>
               <i

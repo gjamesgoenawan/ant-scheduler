@@ -3,6 +3,13 @@ import { useLocation } from "react-router-dom";
 
 import { useMonitorData, API_URL } from "../App";
 import Layout, { useToast } from "../components/layout/layout";
+import {
+  copyCommand,
+  downloadLog,
+  deleteTask,
+  restartTask,
+} from "../utils/taskActions";
+
 
 function Logs() {
   const { data } = useMonitorData();
@@ -13,6 +20,8 @@ function Logs() {
 
   const query = new URLSearchParams(useLocation().search);
   const taskId = query.get("task_id");
+
+  const { addToast } = useToast();
 
   useEffect(() => {
     document.title = `Task Log (${taskId})`;
@@ -100,9 +109,44 @@ function Logs() {
           
           <div className="card">
             
-            <div className="card-header pb-0">
+            <div className="card-header pb-2">
               <div className="d-flex justify-content-between align-items-center">
                 <h5 className="mb-0">{taskId}</h5>
+
+                <div className="d-flex align-items-center gap-1">
+                  <button
+                    className="btn btn-link text-dark p-2 mb-0"
+                    title="Copy Command"
+                    onClick={() => copyCommand(taskInfo, addToast)}
+                  >
+                    <i className="material-icons text-lg">copy</i>
+                  </button>
+
+                  <button
+                    className="btn btn-link text-dark p-2 mb-0"
+                    title="Restart Task"
+                    onClick={() => restartTask(taskId, addToast)}
+                    disabled={statusState === "running"}
+                  >
+                    <i className="material-icons text-lg">restart_alt</i>
+                  </button>
+
+                  <button
+                    className="btn btn-link text-dark p-2 mb-0"
+                    title="Download Log"
+                    onClick={() => downloadLog(taskId, addToast)}
+                  >
+                    <i className="material-icons text-lg">save_alt</i>
+                  </button>
+
+                  <button
+                    className="btn btn-link text-danger p-2 mb-0"
+                    title="Delete Task"
+                    onClick={() => deleteTask(taskId, addToast)}
+                  >
+                    <i className="material-icons text-lg">delete_outline</i>
+                  </button>
+                </div>
               </div>
             </div>
 

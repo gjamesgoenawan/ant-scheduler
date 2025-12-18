@@ -5,8 +5,7 @@ import time
 import uuid
 from typing import Dict, List, Optional
 
-from utils.misc import format_timedelta, format_timestamp
-
+from utils.misc import format_timedelta, format_timestamp, ensure_string_literal
 
 class AntTask():
     def __init__(self,
@@ -31,7 +30,9 @@ class AntTask():
         for k, v in kwargs.items():
             self._keys.add(k)
             self.__setattr__(k, v)
+        self.reset()
 
+    def reset(self):
         self._start_time = None
         self._stop_time = None
         self._is_running = False
@@ -184,12 +185,14 @@ class AntTask():
 
             if len(envar) > 0:
                 for k, v in envar.items():
-                    envar_text += f'{k}={v} '
+                    envar_text += f'{ensure_string_literal(k)}={ensure_string_literal(v)} '
             
             if len(self.runner_envar) > 0:
                 for k, v in self.runner_envar.items():
-                    envar_text += f'{k}={v} '
+                    
+                    envar_text += f'{ensure_string_literal(k)}={ensure_string_literal(v)} '
             envar_text = envar_text.strip()
+            print(envar_text)
 
             if envar_text != '':
                 envar_text = 'export ' + self.parse_random(envar_text) + '; '
@@ -217,7 +220,7 @@ def create_task(cmd):
     
     if isinstance(cmd, str):
         task = AntTask(command=cmd,
-                    task_id=f"manual_{time.strftime('%d_%M_%Y_%H_%M_%S')}",
+                    task_id=f"manual_{time.strftime('%d_%m_%Y_%H_%M_%S')}",
                     n_gpus=cmd.get('n_gpus', 1),
                     gpu_ids=[],
                     envar={})
@@ -229,7 +232,7 @@ def create_task(cmd):
             raise KeyError(f'"command" key cannot be empty. cmd : {cmd}')
             return -1
         task = AntTask(command=command,
-                        task_id=cmd.get('task_id', f"manual_{time.strftime('%d_%M_%Y_%H_%M_%S')}"),
+                        task_id=cmd.get('task_id', f"manual_{time.strftime('%d_%m_%Y_%H_%M_%S')}"),
                         n_gpus=cmd.get('n_gpus', 0),
                         gpu_ids=cmd.get('gpu_ids', []),
                         envar=cmd.get('envar', {}))
