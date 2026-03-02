@@ -37,6 +37,7 @@ class AntTask():
         self._stop_time = None
         self._is_running = False
         self._is_stopped = False
+        self.terminated = False
     
     def start(self):
         self._start_time = time.time()
