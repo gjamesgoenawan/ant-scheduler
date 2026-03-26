@@ -121,10 +121,12 @@ def create_task():
 @app.route("/get_log", methods=["GET"])
 def get_log():
     task_id = request.args.get("task_id")  # get from query string
+    full_log_arg = request.args.get("full_log", "false")
     if not task_id:
         return jsonify({"status": "error", "message": "task_id is required"}), 400
 
-    success, logs = r.get_log(task_id)
+    full_log = str(full_log_arg).strip().lower() in {"1", "true", "yes", "on"}
+    success, logs = r.get_log(task_id, full_log=full_log)
     
     if success:
         return jsonify({"status": "success", "data": logs}), 200
@@ -184,7 +186,7 @@ def emit_vis_data():
         socketio.emit("update_vis_data", vis_data)
         socketio.sleep(r.opt["step_interval"])
 
-def run_api(runner):
+def run_api(runner, debug: bool = False):
     global r
     r = runner
     threading.Thread(target=emit_vis_data, daemon=True).start()
@@ -192,5 +194,8 @@ def run_api(runner):
     host = "0.0.0.0"
     http_port = runner.opt['backend_port']
 
-    listener = eventlet.listen((host, http_port))
-    eventlet.wsgi.server(listener, app, log_output=False)
+    if debug:
+        app.run(host=host, port=http_port, debug=True, use_reloader=False)
+    else:
+        listener = eventlet.listen((host, http_port))
+        eventlet.wsgi.server(listener, app, log_output=False)

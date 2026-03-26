@@ -1,5 +1,8 @@
 cert/
+ant_runner_logs/
 *.ipynb
+*.code-workspace
+thingstodo
 __pycache__
 
 .mypy_cache

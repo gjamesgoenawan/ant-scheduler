@@ -16,6 +16,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='ANT_Scheduler')
     parser.add_argument('gpu_ids', type=split_ints, help='GPU IDs to be utilized by ANT, separated by commas')
     parser.add_argument('--config', type=str, default='config/default.json', help='JSON config for ant.')
+    parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 
     try:
@@ -29,6 +30,6 @@ if __name__ == '__main__':
     r = build_runner(opt)
 
     try:
-        run_api(r)
+        run_api(r, debug=args.debug)
     except Exception as e:
         raise(e)

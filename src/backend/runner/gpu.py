@@ -429,8 +429,9 @@ class gpu_runner(base_runner):
         #     },
         # }
 
-    def get_log(self, 
-                task_id: str) -> Tuple[bool, str]:
+    def get_log(self,
+                task_id: str,
+                full_log: bool = False) -> Tuple[bool, str]:
         task = None
         if task_id in self.task_ongoing:
             task = self.task_ongoing[task_id]
@@ -453,9 +454,15 @@ class gpu_runner(base_runner):
             return False, "Log file not found"
 
         try:
-            rendered_file = parse_and_truncate_file(filename=filename, 
-                                                    max_lines=self.opt.get('VISUALIZER_view_log_max_lines', self.opt.get("VISUALIZER_view_log_max_lines", 500)), 
-                                                    line_break='\n')
+            if full_log:
+                with open(filename) as f:
+                    rendered_file = f.read()
+            else:
+                rendered_file = parse_and_truncate_file(
+                    filename=filename,
+                    max_lines=self.opt.get('VISUALIZER_view_log_max_lines', self.opt.get("VISUALIZER_view_log_max_lines", 500)),
+                    line_break='\n',
+                )
         except FileNotFoundError:
             self.logger.error(f"Log file for task {task_id} at {filename} not found. Maybe its deleted?")
             return False, "Log file not found"

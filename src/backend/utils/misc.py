@@ -142,7 +142,7 @@ def parse_and_truncate_file(filename : str, max_lines : int, line_break : str = 
     
     all_lines = []
     for x in data:
-        all_lines += x.strip().split('\n')
+        all_lines += x.rstrip('\r\n').split('\n')
 
     if len(all_lines) > max_lines:
         all_lines = all_lines[:int(max_lines/2)] + ["", "", "============================", f"{len(all_lines)-max_lines} hidden lines ...", "============================", "", ""] + all_lines[-int(max_lines/2):]

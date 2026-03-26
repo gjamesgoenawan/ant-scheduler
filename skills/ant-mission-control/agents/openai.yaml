@@ -1,0 +1,4 @@
+version: 1
+display_name: ANT Mission Control
+short_description: Submit and monitor local ANT runner jobs
+default_prompt: Launch or monitor jobs on the local ANT runner using the bundled helper scripts.
