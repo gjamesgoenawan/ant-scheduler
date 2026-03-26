@@ -11,6 +11,7 @@ from flask_compress import Compress
 from flask_cors import CORS
 from flask_socketio import SocketIO
 from utils.structures import AntTask
+from utils.misc import ANT_GIT_HASH
 
 # ---- Setup ----
 app = Flask(__name__)
@@ -34,7 +35,11 @@ def safe_runner_call(func, *args, **kwargs):
 # ---- API Endpoints ----
 @app.route("/", methods=["GET"])
 def home():
-    return jsonify({"status": "success", "message": "Ant-Scheduler Backend"}), 200
+    return jsonify({"status": "success", "message": f"Ant-Scheduler Backend (commit: {ANT_GIT_HASH})"}), 200
+
+@app.route("/status", methods=["GET"])
+def status():
+    return jsonify({"status": "success", "message": f"Ant-Scheduler Backend (commit: {ANT_GIT_HASH})"}), 200
 
 @app.route("/kill_task", methods=["POST"])
 def kill_task():

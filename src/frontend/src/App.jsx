@@ -22,8 +22,8 @@ export const API_URL = `/api`;
 export const SOCKETIO_URL = '/';
 
 // dwbug
-// export const API_URL = 'http://10.2.56.5:5000/';
-// export const SOCKETIO_URL = 'http://10.2.56.5:5000/';
+// export const API_URL = 'http://localhost:5000/';
+// export const SOCKETIO_URL = 'http://localhost:5000/';
 
 
 const socket = io(SOCKETIO_URL, {

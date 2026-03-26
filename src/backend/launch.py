@@ -5,6 +5,7 @@ import json
 from apis.flask import run_api
 from test_scripts.test_opt import opt
 from utils.builder import build_runner
+from utils.misc import ANT_GIT_HASH
 
 log = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
@@ -19,6 +20,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 
+    print(f'STARTING ANT_SCHEDULER Backend (Git Commit: {ANT_GIT_HASH})')
     try:
         with open(args.config, 'r', encoding='utf-8') as f:
             opt = json.load(f)

@@ -18,7 +18,7 @@ export default function OngoingTasks() {
 
   return (
     <Layout pageTitle="Ongoing Task">
-      <div className="container-fluid py-2">
+      <div className="container-fluid py-2 ongoing-task-page">
         {runningTasks.length === 0 ? (
           <div
             className="d-flex justify-content-center align-items-center"

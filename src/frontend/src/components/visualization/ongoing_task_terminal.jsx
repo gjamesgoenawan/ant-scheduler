@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from "react";
-import { Link } from 'react-router-dom'; 
+import React, { useEffect, useRef, useState } from "react";
 import { useToast } from "../layout/layout";
+import { copyCommand } from "../../utils/taskActions";
 
 export default function OngoingTaskTerminal({
   task,
@@ -9,6 +9,27 @@ export default function OngoingTaskTerminal({
 }) {
   const { addToast } = useToast();
   const terminalRef = useRef(null);
+  const [isMobileView, setIsMobileView] = useState(false);
+  const [showDetails, setShowDetails] = useState(idx === 0);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767.98px)");
+
+    const syncMobileState = (event) => {
+      const mobile = event.matches;
+      setIsMobileView(mobile);
+    };
+
+    syncMobileState(mediaQuery);
+
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", syncMobileState);
+      return () => mediaQuery.removeEventListener("change", syncMobileState);
+    }
+
+    mediaQuery.addListener(syncMobileState);
+    return () => mediaQuery.removeListener(syncMobileState);
+  }, []);
 
   // Auto-scroll terminal content
   useEffect(() => {
@@ -27,20 +48,9 @@ export default function OngoingTaskTerminal({
     }
   }, [task.console_out]);
 
-  const copyCommandToClipboard = (command) => {
-    navigator.clipboard.writeText(command).then(() => {
-      addToast({
-        type: "success",
-        title: "Command Copied Successfully!",
-        autohide: true,
-        delay: 2000,
-      });
-    });
-  };
-
   return (
     <div className="row mb-4" key={task.task_id}>
-      <div className="card" id={`task-data-${idx}`}>
+      <div className="card ongoing-task-card" id={`task-data-${idx}`}>
         <div className="card-header pb-0" id={`task-id-${idx}`}>
           <div className="d-flex align-items-center justify-content-between">
             <a 
@@ -49,47 +59,72 @@ export default function OngoingTaskTerminal({
               target="_blank" 
               rel="noopener noreferrer"
             >
-              <h4 className="mb-0 mt-2">{task.task_id}</h4>
+              <h4 className="mb-0 mt-2 ongoing-task-title">{task.task_id}</h4>
             </a>
+            <button
+              className="btn btn-link text-dark p-1 mb-0 d-flex align-items-center ongoing-task-mobile-toggle"
+              onClick={() => setShowDetails((current) => !current)}
+            >
+              <span className="text-xxs text-uppercase font-weight-bolder me-1">
+                {showDetails ? "Hide" : "Show"}
+              </span>
+              <i className="material-icons text-sm">
+                {showDetails ? "expand_less" : "expand_more"}
+              </i>
+            </button>
           </div>
         </div>
         <div className="card-body">
-          <ul className="list-group">
-            <li className="list-group-item border-0 ps-0 pt-0 text-sm">
-              <strong className="text-dark">Status :</strong>{" "}
-              <span className="badge badge-sm bg-gradient-info">
-                Running
-              </span>
-            </li>
-            <li className="list-group-item border-0 ps-0 pt-0 text-sm">
-              <strong className="text-dark">Running Time :</strong>{" "}
-              {task.time.runtime}
-            </li>
-            <li className="list-group-item border-0 ps-0 pt-0 text-sm">
-              <strong className="text-dark">GPU IDs :</strong>{" "}
-              {task.gpu_ids.join(", ") || "No GPU Assigned"}
-            </li>
-            <li className="list-group-item border-0 ps-0 pt-0 text-sm">
-              <strong className="text-dark">Command :</strong>{" "}
-              {task.command}
-            </li>
+          <div className="bg-gray-100 rounded p-3 ongoing-task-details-shell" style={{ backgroundColor: "#f8f9fa" }}>
+            <div
+              className={`ongoing-task-summary ${showDetails ? "mb-3" : "mb-0"}`}
+            >
+              <div className="row">
+                <div className="col-md-4 col-6 mb-3">
+                  <span className="text-xs font-weight-bold text-secondary text-uppercase">Status</span>
+                  <p className="text-sm text-info font-weight-bold mb-0">Running</p>
+                </div>
 
-            <div className="terminal-window">
-              <div
-                className="terminal-content"
-                ref={terminalRef}
-              >
-                {task.console_out.join("\n")}
+                <div className="col-md-4 col-6 mb-3">
+                  <span className="text-xs font-weight-bold text-secondary text-uppercase">Running Time</span>
+                  <p className="text-sm text-dark font-weight-bold mb-0">{task.time.runtime}</p>
+                </div>
+
+                <div className="col-md-4 col-12 mb-3">
+                  <span className="text-xs font-weight-bold text-secondary text-uppercase">GPU IDs</span>
+                  <p className="text-sm text-dark font-weight-bold mb-0">
+                    {task.gpu_ids.join(", ") || "No GPU Assigned"}
+                  </p>
+                </div>
               </div>
             </div>
 
-            <div
+            {showDetails ? (
+              <>
+              <div className="ongoing-task-command-panel mb-3">
+                <div className="text-xs font-weight-bold text-secondary text-uppercase mb-2">Command</div>
+                <code className="text-dark ongoing-task-command-text">{task.command}</code>
+              </div>
+              <div className="terminal-window">
+                <div
+                  className="terminal-content"
+                  ref={terminalRef}
+                >
+                  {task.console_out.join("\n")}
+                </div>
+              </div>
+              </>
+            ) : null}
+          </div>
+
+          <div
+              className="ongoing-task-actions"
               id="action-buttons"
               style={{ textAlign: "right", float: "right" }}
             >
               <button
                 className="btn btn-link text-dark px-3 py-0 mt-3 mb-1"
-                onClick={() => copyCommandToClipboard(task.command)}
+                onClick={() => copyCommand(task, addToast)}
               >
                 <i className="material-icons text-m me-2">copy</i>
               </button>
@@ -101,19 +136,18 @@ export default function OngoingTaskTerminal({
                   window.open(`/logs?task_id=${task.task_id}`, "_blank")
                 }
               >
-                <i className="material-icons text-m me-2">
+                <i className="material-icons text-sm me-1">
                   open_in_new
                 </i>
               </button>
 
               <button
-                className="btn btn-danger mt-3 mb-1"
+                className="btn btn-danger mt-3 mb-1 ongoing-task-terminate-btn"
                 onClick={() => onTerminate(task.task_id)}
               >
                 Terminate
               </button>
-            </div>
-          </ul>
+          </div>
         </div>
       </div>
     </div>

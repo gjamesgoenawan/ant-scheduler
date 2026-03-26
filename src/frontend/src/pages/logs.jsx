@@ -7,6 +7,7 @@ import {
   copyCommand,
   downloadLog,
   deleteTask,
+  terminateTask,
   restartTask,
 } from "../utils/taskActions";
 
@@ -104,16 +105,15 @@ function Logs() {
 
   return (
     <Layout pageTitle="Task Log">
-      <div className="container-fluid py-2">
+      <div className="container-fluid py-2 logs-page">
         <div className="row mb-2">
-          
-          <div className="card">
+          <div className="card log-task-card">
             
-            <div className="card-header pb-2">
-              <div className="d-flex justify-content-between align-items-center">
-                <h5 className="mb-0">{taskId}</h5>
+            <div className="card-header pb-2 log-task-header">
+              <div className="d-flex justify-content-between align-items-center log-task-header-row">
+                <h5 className="mb-0 log-task-title">{taskId}</h5>
 
-                <div className="d-flex align-items-center gap-1">
+                <div className="d-flex align-items-center gap-1 log-task-actions">
                   <button
                     className="btn btn-link text-dark p-2 mb-0"
                     title="Copy Command"
@@ -141,10 +141,16 @@ function Logs() {
 
                   <button
                     className="btn btn-link text-danger p-2 mb-0"
-                    title="Delete Task"
-                    onClick={() => deleteTask(taskId, addToast)}
+                    title={statusState === "running" ? "Kill Task" : "Delete Task"}
+                    onClick={() =>
+                      statusState === "running"
+                        ? terminateTask(taskId, addToast)
+                        : deleteTask(taskId, addToast)
+                    }
                   >
-                    <i className="material-icons text-lg">delete_outline</i>
+                    <i className="material-icons text-lg">
+                      {statusState === "running" ? "stop_circle" : "delete_outline"}
+                    </i>
                   </button>
                 </div>
               </div>
@@ -161,9 +167,9 @@ function Logs() {
                     </div>
                 </div>
             ) : (
-                <div className="card-body px-4 pt-4">
+                <div className="card-body px-4 pt-4 log-task-body">
               
-                    <div className="bg-gray-100 rounded p-3 mb-4" style={{ backgroundColor: "#f8f9fa" }}>
+                    <div className="bg-gray-100 rounded p-3 mb-4 log-task-summary" style={{ backgroundColor: "#f8f9fa" }}>
                       <div className="row">
                         
                         <div className="col-md-3 col-6 mb-3">
@@ -194,15 +200,16 @@ function Logs() {
                             </p>
                           </div>
 
-                          <div className="col-12 mt-1">
-                            <span className="text-xs font-weight-bold text-secondary text-uppercase">Command</span>
-                            <div className="p-2 border rounded bg-white mt-1">
-                              <code className="text-dark" style={{ wordBreak: "break-all" }}>
-                                {taskInfo?.command || "-"}
-                              </code>
-                            </div>
-                          </div>
                         </>
+                      </div>
+
+                      <div className="log-task-command-row mt-1">
+                        <div className="text-xs font-weight-bold text-secondary text-uppercase mb-2">Command</div>
+                        <div className="log-task-command">
+                          <code className="text-dark log-task-command-text" style={{ wordBreak: "break-all" }}>
+                            {taskInfo?.command || "-"}
+                          </code>
+                        </div>
                       </div>
                     </div>
                   
@@ -210,10 +217,10 @@ function Logs() {
                       Log Output
                     </h6>
                     <div 
-                      className="bg-black text-light p-3 rounded" 
+                      className="bg-black text-light p-3 rounded log-output-shell" 
                       style={{ minHeight: "300px" }}
                     >
-                      <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>{logs || "Failed to load Log."}</pre>
+                      <pre className="log-output-pre" style={{ margin: 0, whiteSpace: "pre-wrap" }}>{logs || "Failed to load Log."}</pre>
                     </div>
 
                 </div>

@@ -2,6 +2,7 @@ import os
 import re
 import datetime
 import functools
+import subprocess
 from typing import List
 
 INF = float('inf')
@@ -244,3 +245,37 @@ class Smoother:
         Get the current smoothed value.
         """
         return self.data
+
+def get_git_hash_subprocess(length: int = 40) -> str:
+    """
+    Retrieves the git commit hash of the current repository using the subprocess module.
+
+    Args:
+        length: The desired length of the hash (default is 40 for full hash;
+                use 7 for a short hash).
+
+    Returns:
+        The git commit hash as a string, or 'unknown' if an error occurs.
+    """
+    try:
+        # Command to get the full hash: "git rev-parse HEAD"
+        # Command to get a short hash: "git rev-parse --short HEAD"
+        command = ["git", "rev-parse", "--short", "HEAD"] if length < 40 else ["git", "rev-parse", "HEAD"]
+        
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stdout, stderr = process.communicate()
+        
+        if process.returncode == 0:
+            return stdout.strip()
+        else:
+            # Handle cases where the command fails (e.g., not a git repo, git not installed)
+            print(f"Git command failed: {stderr.strip()}")
+            return "unknown"
+    except FileNotFoundError:
+        print("The 'git' executable was not found. Please ensure Git is installed and in your system's PATH.")
+        return "unknown"
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return "unknown"
+
+ANT_GIT_HASH = get_git_hash_subprocess()

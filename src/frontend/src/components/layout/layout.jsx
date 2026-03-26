@@ -47,7 +47,7 @@ export default function Layout({ children, pageTitle }) {
       <div className={`g-sidenav-show bg-gray-200 ${sidebarPinned ? "g-sidenav-pinned" : "g-sidenav-hidden"}`}>
         <Sidebar pinned={sidebarPinned} />
         <main className="main-content position-relative border-radius-lg">
-          <div className="container-fluid bg-gray-200" style={{ minHeight: "100vh" }}>
+          <div className="container-fluid bg-gray-200 app-shell" style={{ minHeight: "100vh" }}>
             <Navbar pageTitle={pageTitle} toggleSidebar={toggleSidebar} />
             {children}
           </div>
