@@ -18,6 +18,20 @@ import {
 
 Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Title, Tooltip, Legend);
 
+const GPU_LINE_COLORS = [
+  "#7dd3fc",
+  "#c4b5fd",
+  "#f9a8d4",
+  "#86efac",
+  "#fcd34d",
+  "#fb7185",
+];
+const CHART_GRID_COLOR = "rgba(148, 163, 184, 0.24)";
+const CHART_TICK_COLOR = "#64748b";
+const CHART_TITLE_COLOR = "#334155";
+const CHART_CPU_COLOR = "#742191";
+const CHART_RAM_COLOR = "#8b5cf6";
+
 function latestMetricValue(series, fallback = 0) {
   if (!Array.isArray(series) || series.length === 0) return fallback;
   const value = series[series.length - 1];
@@ -26,6 +40,110 @@ function latestMetricValue(series, fallback = 0) {
 
 function clampPercent(value) {
   return Math.max(0, Math.min(100, value));
+}
+
+function simplifyGpuName(name) {
+  if (!name) return "";
+
+  return name
+    .replace(/^nvidia\s+/i, "")
+    .replace(/^geforce\s+/i, "")
+    .replace(/^quadro\s+/i, "")
+    .replace(/^rtx\s+/i, "")
+    .trim();
+}
+
+function formatGpuFleetSummary(names) {
+  if (!Array.isArray(names) || names.length === 0) return "No GPU workers detected";
+
+  const normalizedNames = names.map((name) => String(name).trim()).filter(Boolean);
+  if (normalizedNames.length === 0) return "No GPU workers detected";
+
+  const counts = normalizedNames.reduce((acc, name) => {
+    acc.set(name, (acc.get(name) || 0) + 1);
+    return acc;
+  }, new Map());
+
+  if (counts.size === 1) {
+    const [name] = counts.keys();
+    return `${normalizedNames.length}x ${name}`;
+  }
+
+  return Array.from(counts.entries())
+    .map(([name, count]) => `${count}x ${simplifyGpuName(name) || name}`)
+    .join(" · ");
+}
+
+function buildLineChartOptions({ min = 0, max, title }) {
+  return {
+    animation: false,
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false,
+      },
+    },
+    interaction: {
+      intersect: false,
+      mode: "index",
+    },
+    elements: {
+      line: {
+        tension: 0.5,
+      },
+    },
+    scales: {
+      y: {
+        min,
+        max,
+        grid: {
+          drawBorder: false,
+          display: true,
+          drawOnChartArea: true,
+          drawTicks: false,
+          borderDash: [5, 5],
+          color: CHART_GRID_COLOR,
+        },
+        ticks: {
+          display: true,
+          color: CHART_TICK_COLOR,
+          padding: 5,
+          font: {
+            size: 12,
+            weight: 400,
+            family: "Roboto",
+            style: "normal",
+            lineHeight: 2,
+          },
+        },
+        title: {
+          display: true,
+          text: title,
+          color: CHART_TITLE_COLOR,
+          font: {
+            size: 13,
+            weight: 500,
+            family: "Roboto",
+            style: "normal",
+            lineHeight: 2,
+          },
+        },
+      },
+      x: {
+        grid: {
+          drawBorder: false,
+          display: false,
+          drawOnChartArea: false,
+          drawTicks: false,
+          borderDash: [5, 5],
+        },
+        ticks: {
+          display: false,
+        },
+      },
+    },
+  };
 }
 
 function MobileMetricBar({ label, valueText, percent, tone = "primary" }) {
@@ -90,79 +208,11 @@ export default function Home() {
         type: "line",
         data: { labels, datasets: [{ label: "CPU Usage", 
                                      data: monitor.cpu_usage, 
-                                     borderColor: "rgba(255,255,255,0.8)", 
+                                     borderColor: CHART_CPU_COLOR, 
                                      fill: false,
                                      pointRadius: 0.0,
                                      borderWidth: 2 }] },
-        options: {
-            animation: false,
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false,
-                }
-            },
-            interaction: {
-              intersect: false,
-              mode: 'index',
-            },
-            elements: {
-                line: {
-                    tension: 0.5 // Adjust this value for desired smoothness
-                }
-            },
-            scales: {
-            y: {
-                min: 0,
-                max: 100,
-                grid: {
-                drawBorder: false,
-                display: true,
-                drawOnChartArea: true,
-                drawTicks: false,
-                borderDash: [5, 5],
-                color: 'rgba(255, 255, 255, .2)'
-                },
-                ticks: {
-                display: true,
-                color: '#f8f9fa',
-                padding: 5,
-                font: {
-                    size: 12,
-                    weight: 300,
-                    family: "Roboto",
-                    style: 'normal',
-                    lineHeight: 2
-                },
-                },
-                title: {
-                display: true,
-                text: 'Usage (%)',
-                color: '#FFFFFF',
-                font: {
-                    size: 14,
-                    weight: 300,
-                    family: "Roboto",
-                    style: 'normal',
-                    lineHeight: 2
-                },
-                }
-            },
-            x: {
-                grid: {
-                drawBorder: false,
-                display: false,
-                drawOnChartArea: false,
-                drawTicks: false,
-                borderDash: [5, 5]
-                },
-                ticks : {
-                display: false,
-                },
-            },
-            },
-        },
+        options: buildLineChartOptions({ max: 100, title: "Usage (%)" }),
       });
     }
 
@@ -171,79 +221,11 @@ export default function Home() {
         type: "line",
         data: { labels, datasets: [{ label: "RAM Usage", 
                                      data: monitor.ram_usage, 
-                                     borderColor: "rgba(255,255,255,0.8)", 
+                                     borderColor: CHART_RAM_COLOR, 
                                      fill: false ,
                                      pointRadius: 0.0,
                                      borderWidth: 2 }] },
-        options: {
-            animation: false,
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    display: false,
-                }
-            },
-            interaction: {
-              intersect: false,
-              mode: 'index',
-            },
-            elements: {
-                line: {
-                    tension: 0.5 // Adjust this value for desired smoothness
-                }
-            },
-            scales: {
-            y: {
-                min: 0,
-                max: monitor.ram_total,
-                grid: {
-                drawBorder: false,
-                display: true,
-                drawOnChartArea: true,
-                drawTicks: false,
-                borderDash: [5, 5],
-                color: 'rgba(255, 255, 255, .2)'
-                },
-                ticks: {
-                display: true,
-                color: '#f8f9fa',
-                padding: 5,
-                font: {
-                    size: 12,
-                    weight: 300,
-                    family: "Roboto",
-                    style: 'normal',
-                    lineHeight: 2
-                },
-                },
-                title: {
-                display: true,
-                text: 'RAM (GBs)',
-                color: '#FFFFFF',
-                font: {
-                    size: 14,
-                    weight: 300,
-                    family: "Roboto",
-                    style: 'normal',
-                    lineHeight: 2
-                },
-                }
-            },
-            x: {
-                grid: {
-                drawBorder: false,
-                display: false,
-                drawOnChartArea: false,
-                drawTicks: false,
-                borderDash: [5, 5]
-                },
-                ticks : {
-                display: false,
-                },
-            },
-            },
-        },
+        options: buildLineChartOptions({ max: monitor.ram_total, title: "Usage (GB)" }),
       });
     }
 
@@ -254,80 +236,12 @@ export default function Home() {
           labels,
           datasets: monitor.gpu_usage.map((d, i) => ({ label: `GPU ${i}`, 
                                                        data: d, 
-                                                       borderColor: "rgba(255,255,255,0.8)", 
+                                                       borderColor: GPU_LINE_COLORS[i % GPU_LINE_COLORS.length], 
                                                        fill: false,
                                                        pointRadius: 0.0,
                                                        borderWidth: 2 })),
         },
-        options: {
-            animation: false,
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: {
-                  display: false,
-              }
-            },
-            interaction: {
-              intersect: false,
-              mode: 'index',
-            },
-            elements: {
-                line: {
-                    tension: 0.5 // Adjust this value for desired smoothness
-                }
-            },
-            scales: {
-            y: {
-                min: 0,
-                max: 100,
-                grid: {
-                drawBorder: false,
-                display: true,
-                drawOnChartArea: true,
-                drawTicks: false,
-                borderDash: [5, 5],
-                color: 'rgba(255, 255, 255, .2)'
-                },
-                ticks: {
-                display: true,
-                color: '#f8f9fa',
-                padding: 5,
-                font: {
-                    size: 12,
-                    weight: 300,
-                    family: "Roboto",
-                    style: 'normal',
-                    lineHeight: 2
-                },
-                },
-                title: {
-                display: true,
-                text: 'Usage (%)',
-                color: '#FFFFFF',
-                font: {
-                    size: 14,
-                    weight: 300,
-                    family: "Roboto",
-                    style: 'normal',
-                    lineHeight: 2
-                },
-                }
-            },
-            x: {
-                grid: {
-                drawBorder: false,
-                display: false,
-                drawOnChartArea: false,
-                drawTicks: false,
-                borderDash: [5, 5]
-                },
-                ticks : {
-                display: false,
-                },
-            },
-            },
-        },
+        options: buildLineChartOptions({ max: 100, title: "Usage (%)" }),
       });
     }
 
@@ -337,80 +251,12 @@ export default function Home() {
         data: {
           labels,
           datasets: monitor.gpu_memory.map((d, i) => ({ label: `GPU ${i}`, 
-                                                        data: d, borderColor: "rgba(255,255,255,0.8)", 
+                                                        data: d, borderColor: GPU_LINE_COLORS[i % GPU_LINE_COLORS.length], 
                                                         fill: false, 
                                                         pointRadius: 0.0,
                                                         borderWidth: 2})),
         },
-        options: {
-            animation: false,
-            responsive: true,
-            maintainAspectRatio: false,
-            elements: {
-                line: {
-                    tension: 0.5 // Adjust this value for desired smoothness
-                }
-            },
-            plugins: {
-                legend: {
-                    display: false,
-                }
-            },
-            interaction: {
-              intersect: false,
-              mode: 'index',
-            },
-            scales: {
-            y: {
-                min: 0,
-                max: Math.max(...monitor.gpu_total_memory),
-                grid: {
-                drawBorder: false,
-                display: true,
-                drawOnChartArea: true,
-                drawTicks: false,
-                borderDash: [5, 5],
-                color: 'rgba(255, 255, 255, .2)'
-                },
-                ticks: {
-                display: true,
-                color: '#f8f9fa',
-                padding: 5,
-                font: {
-                    size: 12,
-                    weight: 300,
-                    family: "Roboto",
-                    style: 'normal',
-                    lineHeight: 2
-                },
-                },
-                title: {
-                display: true,
-                text: 'Memory (GBs)',
-                color: '#FFFFFF',
-                font: {
-                    size: 14,
-                    weight: 300,
-                    family: "Roboto",
-                    style: 'normal',
-                    lineHeight: 2
-                },
-                }
-            },
-            x: {
-                grid: {
-                drawBorder: false,
-                display: false,
-                drawOnChartArea: false,
-                drawTicks: false,
-                borderDash: [5, 5]
-                },
-                ticks : {
-                display: false,
-                },
-            },
-            },
-        },
+        options: buildLineChartOptions({ max: Math.max(...monitor.gpu_total_memory), title: "Usage (GB)" }),
       });
     }
   }, [data, isMobileView]);
@@ -445,6 +291,10 @@ export default function Home() {
   const cpuUsage = latestMetricValue(monitor?.cpu_usage, 0);
   const ramUsage = latestMetricValue(monitor?.ram_usage, 0);
   const ramTotal = monitor?.ram_total || 0;
+  const ramUsagePercent = ramTotal > 0 ? (ramUsage / ramTotal) * 100 : 0;
+  const queuedCount = data?.task_queue?.length || 0;
+  const runningCount = data?.task_ongoing?.length || 0;
+  const completedCount = data?.task_completed?.length || 0;
   const gpuCards = (monitor?.gpu_name || []).map((name, index) => {
     const gpuUsage = latestMetricValue(monitor?.gpu_usage?.[index], 0);
     const gpuMemory = latestMetricValue(monitor?.gpu_memory?.[index], 0);
@@ -460,24 +310,27 @@ export default function Home() {
       memoryPercent: gpuMemoryTotal > 0 ? (gpuMemory / gpuMemoryTotal) * 100 : 0,
     };
   });
+  const gpuEnabledCount = (monitor?.gpu_allowed || []).filter(Boolean).length;
+  const gpuReadyCount = (monitor?.gpu_availability || []).filter((value) => value !== 0).length;
+  const totalVram = (monitor?.gpu_total_memory || []).reduce(
+    (sum, value) => sum + (Number.isFinite(value) ? value : 0),
+    0
+  );
+  const gpuFleetSummary = formatGpuFleetSummary(monitor?.gpu_name || []);
 
   return (
     <Layout pageTitle="Dashboard">
       <div className="container-fluid py-2 dashboard-page">
         {isMobileView ? (
           <div className="dashboard-mobile-shell">
-            <div className="dashboard-mobile-card dashboard-mobile-hero">
-              <div className="dashboard-mobile-eyebrow">System Overview</div>
-              <div className="dashboard-mobile-title">
-                {monitor ? `${monitor.cpu_count} cores · ${monitor.gpu_name?.length || 0} workers` : "Waiting for monitor data"}
+            <div className="dashboard-mobile-card dashboard-mobile-card-compute">
+              <div className="dashboard-mobile-card-header">
+                <div className="dashboard-mobile-card-eyebrow">Compute</div>
+                <div className="dashboard-mobile-card-title">CPU &amp; Memory</div>
+                <div className="dashboard-mobile-card-subtitle">
+                  {monitor ? `${monitor.cpu_count} Cores - ${monitor.cpu_name}` : "Connecting to backend..."}
+                </div>
               </div>
-              <div className="dashboard-mobile-subtitle">
-                {monitor ? monitor.cpu_name : "Connecting to backend..."}
-              </div>
-            </div>
-
-            <div className="dashboard-mobile-card">
-              <div className="dashboard-mobile-section-title">Compute</div>
               <div className="dashboard-mobile-metrics">
                 <MobileMetricBar
                   label="CPU Usage"
@@ -495,7 +348,23 @@ export default function Home() {
             </div>
 
             <div className="dashboard-mobile-card">
-              <div className="dashboard-mobile-section-title">GPU Overview</div>
+              <div className="dashboard-mobile-section-header">
+                <div>
+                  <div className="dashboard-mobile-card-eyebrow">Workers</div>
+                  <div className="dashboard-mobile-card-title">GPU Fleet</div>
+                  <div className="dashboard-mobile-card-subtitle">
+                    {gpuCards.length > 0
+                      ? `${gpuEnabledCount} enabled ${gpuReadyCount} ready`
+                      : "No GPU workers detected"}
+                  </div>
+                </div>
+                <div className="dashboard-panel-kpis">
+                  <div className="dashboard-panel-kpi">
+                    <span className="dashboard-panel-kpi-label">Ready</span>
+                    <span className="dashboard-panel-kpi-value">{gpuReadyCount}</span>
+                  </div>
+                </div>
+              </div>
               <div className="dashboard-mobile-gpu-groups">
                 <div className="dashboard-mobile-gpu-group">
                   <div className="dashboard-mobile-gpu-group-title">Utilization</div>
@@ -529,93 +398,172 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="dashboard-mobile-card">
-              <TaskStatus data={data} />
-            </div>
+            <TaskStatus data={data} />
 
-            <div className="dashboard-mobile-card">
-              <GpuToggleList data={data} />
-            </div>
+            <GpuToggleList data={data} />
           </div>
         ) : (
         <>
-        <div className="row mb-2">
-          <div className="col-lg-6 col-md-6 mb-2 dashboard-desktop-col-left">
-            <div className="card bg-gradient-primary dashboard-desktop-chart-card">
-              <div className="card-header pb-0 bg-transparent">
-                <h6 className="dashboard-desktop-card-title">
-                  <div className="d-flex">
-                    <div className="dashboard-desktop-card-icon">
-                      <i className="material-icons opacity-10">memory</i>
-                    </div>
-                    <div>
-                      {data?.monitor.cpu_count} Cores {data?.monitor.cpu_name}
-                    </div>
+        <div className="dashboard-overview-grid mb-3">
+          <div className="dashboard-overview-card dashboard-overview-card-compute">
+            <div className="dashboard-overview-copy">
+              <div className="dashboard-overview-label">CPU</div>
+              <div className="dashboard-overview-value">{cpuUsage.toFixed(1)}%</div>
+              <div className="dashboard-overview-meta">{monitor?.cpu_count || 0} cores online</div>
+            </div>
+          </div>
+
+          <div className="dashboard-overview-card dashboard-overview-card-memory">
+            <div className="dashboard-overview-copy">
+              <div className="dashboard-overview-label">RAM</div>
+              <div className="dashboard-overview-value">{ramUsage.toFixed(1)} / {ramTotal.toFixed(1)} GB</div>
+              <div className="dashboard-overview-meta">{ramUsagePercent.toFixed(0)}% in use</div>
+            </div>
+          </div>
+
+          <div className="dashboard-overview-card dashboard-overview-card-workers">
+            <div className="dashboard-overview-copy">
+              <div className="dashboard-overview-label">Workers</div>
+              <div className="dashboard-overview-value">{gpuReadyCount} ready</div>
+              <div className="dashboard-overview-meta">{gpuEnabledCount} enabled · {totalVram} GB VRAM</div>
+            </div>
+          </div>
+
+          <div className="dashboard-overview-card dashboard-overview-card-tasks">
+            <div className="dashboard-overview-copy">
+              <div className="dashboard-overview-label">Tasks</div>
+              <div className="dashboard-overview-value">{runningCount} running</div>
+              <div className="dashboard-overview-meta">{queuedCount} queued · {completedCount} completed</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="row mb-3">
+          <div className="col-lg-6 mb-3 mb-lg-0">
+            <div className="dashboard-history-panel dashboard-history-panel-compute">
+              <div className="dashboard-history-header">
+                <div>
+                  <div className="dashboard-panel-eyebrow">System</div>
+                  <h5 className="dashboard-panel-title">Processor</h5>
+                  <div className="dashboard-panel-subtitle">
+                    {monitor ? `${monitor.cpu_count} cores · ${monitor.cpu_name}` : "Waiting for monitor data"}
                   </div>
-                </h6>
+                </div>
+                <div className="dashboard-panel-kpis">
+                  <div className="dashboard-panel-kpi">
+                    <span className="dashboard-panel-kpi-label">Live</span>
+                    <span className="dashboard-panel-kpi-value">{cpuUsage.toFixed(1)}%</span>
+                  </div>
+                </div>
               </div>
-              <div className="card-body pt-1">
-                <div className="row">
-                  <div className="col-lg-6 col-md-6 mt-0 mb-2">
-                    <div className="bg-transparent border-radius-lg py-3 pe-1">
-                      <div className="chart dashboard-desktop-chart-shell">
-                        <canvas ref={cpuRef}/>
-                      </div>
-                    </div>
+
+              <div className="dashboard-chart-card dashboard-chart-card-compute">
+                <div className="dashboard-chart-card-header">
+                  <div>
+                    <div className="dashboard-chart-card-label">CPU Utilization</div>
+                    <div className="dashboard-chart-card-meta">Overall utilization history</div>
                   </div>
-                  <div className="col-lg-6 col-md-6 mt-0 mb-2">
-                    <div className="bg-transparent border-radius-lg py-3 pe-1">
-                      <div className="chart dashboard-desktop-chart-shell">
-                        <canvas ref={ramRef}/>
-                      </div>
-                    </div>
-                  </div>
+                  <div className="dashboard-chart-card-live">{cpuUsage.toFixed(1)}%</div>
+                </div>
+                <div className="chart dashboard-chart-canvas">
+                  <canvas ref={cpuRef}/>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="col-lg-6 col-md-6 mb-2 dashboard-desktop-col-right">
-            <div className="card bg-gradient-secondary dashboard-desktop-chart-card">
-              <div className="card-header pb-0 bg-transparent">
-                <h6 className="dashboard-desktop-card-title">
-                  <div className="d-flex">
-                    <div className="dashboard-desktop-card-icon">
-                      <i className="material-icons opacity-10">dns</i>
-                    </div>
-                    <div>
-                      {data?.monitor.gpu_name.length} x {data?.monitor.gpu_name[0]} @ {data?.monitor.gpu_total_memory[0]}GB VRAM
-                    </div>
+          <div className="col-lg-6">
+            <div className="dashboard-history-panel dashboard-history-panel-compute">
+              <div className="dashboard-history-header">
+                <div>
+                  <div className="dashboard-panel-eyebrow">System</div>
+                  <h5 className="dashboard-panel-title">Memory</h5>
+                  <div className="dashboard-panel-subtitle">
+                    {monitor ? `${ramTotal.toFixed(1)} GB total system memory` : "Waiting for monitor data"}
                   </div>
-                </h6>
+                </div>
+                <div className="dashboard-panel-kpis">
+                  <div className="dashboard-panel-kpi">
+                    <span className="dashboard-panel-kpi-label">Live</span>
+                    <span className="dashboard-panel-kpi-value">{ramUsage.toFixed(1)} / {ramTotal.toFixed(1)} GB</span>
+                  </div>
+                </div>
               </div>
-              <div className="card-body pt-1">
-                <div className="row">
-                  <div className="col-lg-6 col-md-6 mt-0 mb-2">
-                    <div className="bg-transparent border-radius-lg py-3 pe-1">
-                      <div className="chart dashboard-desktop-chart-shell">
-                        <canvas ref={gpuUsageRef}/>
-                      </div>
-                    </div>
+
+              <div className="dashboard-chart-card dashboard-chart-card-compute-alt">
+                <div className="dashboard-chart-card-header">
+                  <div>
+                    <div className="dashboard-chart-card-label">RAM Utilization</div>
+                    <div className="dashboard-chart-card-meta">Overall utilization</div>
                   </div>
-                  <div className="col-lg-6 col-md-6 mt-0 mb-2">
-                    <div className="bg-transparent border-radius-lg py-3 pe-1">
-                      <div className="chart dashboard-desktop-chart-shell">
-                        <canvas ref={gpuMemoryRef}/>
-                      </div>
-                    </div>
-                  </div>
+                  <div className="dashboard-chart-card-live">{ramUsagePercent.toFixed(0)}%</div>
+                </div>
+                <div className="chart dashboard-chart-canvas">
+                  <canvas ref={ramRef}/>
                 </div>
               </div>
             </div>
           </div>
         </div>
-        <div className="row mb-2">
-          <div className="col-lg-6 col-md-6 mb-2 dashboard-desktop-col-left dashboard-desktop-stat-col">
-            <TaskStatus data={data}/>
+
+        <div className="row mb-3">
+          <div className="col-lg-6 mb-3 mb-lg-0">
+            <div className="dashboard-history-panel dashboard-history-panel-gpu">
+              <div className="dashboard-history-header">
+                <div>
+                  <div className="dashboard-panel-eyebrow">Workers</div>
+                  <h5 className="dashboard-panel-title">GPU Fleet</h5>
+                  <div className="dashboard-panel-subtitle">
+                    {gpuCards.length > 0
+                      ? `${gpuFleetSummary} · ${gpuEnabledCount} enabled · ${gpuReadyCount} ready`
+                      : "No GPU workers detected"}
+                  </div>
+                </div>
+                <div className="dashboard-panel-kpis">
+                  <div className="dashboard-panel-kpi">
+                    <span className="dashboard-panel-kpi-label">Ready</span>
+                    <span className="dashboard-panel-kpi-value">{gpuReadyCount}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="dashboard-chart-grid dashboard-chart-grid-gpu">
+                <div className="dashboard-chart-card dashboard-chart-card-gpu">
+                  <div className="dashboard-chart-card-header">
+                    <div>
+                      <div className="dashboard-chart-card-label">GPU Utilization</div>
+                      <div className="dashboard-chart-card-meta">Per-worker compute load</div>
+                    </div>
+                  </div>
+                  <div className="chart dashboard-chart-canvas">
+                    <canvas ref={gpuUsageRef}/>
+                  </div>
+                </div>
+
+                <div className="dashboard-chart-card dashboard-chart-card-gpu-alt">
+                  <div className="dashboard-chart-card-header">
+                    <div>
+                      <div className="dashboard-chart-card-label">GPU Memory Utilization</div>
+                      <div className="dashboard-chart-card-meta">Per-worker memory footprint</div>
+                    </div>
+                  </div>
+                  <div className="chart dashboard-chart-canvas">
+                    <canvas ref={gpuMemoryRef}/>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="col-lg-6 col-md-6 mb-2 dashboard-desktop-col-right dashboard-desktop-stat-col">
-            <GpuToggleList data={data} /> 
+
+          <div className="col-lg-6">
+            <div className="dashboard-side-stack">
+              <div className="dashboard-task-stack-item">
+                <TaskStatus data={data} />
+              </div>
+              <div className="dashboard-worker-stack-item">
+                <GpuToggleList data={data} />
+              </div>
+            </div>
           </div>
         </div>
         </>

@@ -85,8 +85,8 @@ const showCreateSuccessToast = () => {
       <div className="container-fluid py-2 create-task-page">
         <div className="row">
           {/* Task Form */}
-          <div className="card mb-4">
-            <div className="card-body">
+          <div className="mb-4 dashboard-ops-panel create-task-form-panel">
+            <div className="create-task-form-panel-body">
               <TaskForm
                 queueMode={queueMode}
                 setQueueMode={setQueueMode}
@@ -106,7 +106,7 @@ const showCreateSuccessToast = () => {
             </div>
           </div>
         </div>
-        <div className="row mb-4">
+        <div className="row mb-4 create-task-stats-row">
           <div className="col-lg-6 col-md-6 create-task-status-col">
             <TaskStatus data={data} />
           </div>

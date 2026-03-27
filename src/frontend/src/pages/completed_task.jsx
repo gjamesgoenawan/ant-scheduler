@@ -273,10 +273,10 @@ export default function CompletedTasks() {
     <Layout pageTitle="Completed Tasks">
       <div className="container-fluid py-2 completed-task-page">
         <div className="row mb-2">
-          <div className="card px-0 overflow-hidden completed-task-shell">
+          <div className="px-0 overflow-hidden completed-task-shell">
             
             {/* Table-Like Header Row */}
-            <div className="card-header pb-2 border-bottom">
+            <div className="completed-task-panel-header pb-2 border-bottom">
               <div
                 className="completed-task-toolbar d-flex justify-content-between align-items-center px-3 pb-3 border-bottom mb-3"
                 style={{ minHeight: "42px" }}
@@ -395,7 +395,7 @@ export default function CompletedTasks() {
               </div>
             </div>
 
-            <div className="card-body p-0">
+            <div className="completed-task-panel-body p-0">
               {filteredTasks.length === 0 ? (
                   <div className="text-center py-4 text-muted">No completed tasks found.</div>
               ) : (

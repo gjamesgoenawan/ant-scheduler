@@ -7,12 +7,23 @@ export default function QueuedTaskList({ queuedTasks }) {
   const { addToast } = useToast();
 
   return (
-    <div className="card">
-      <div className="card-header pb-0">
-        <h4>Queued Tasks</h4>
+    <div className="queued-task-card dashboard-ops-panel">
+      <div className="queued-task-card-header">
+        <div className="dashboard-ops-header mb-0">
+          <div>
+            <div className="dashboard-panel-eyebrow">Queue</div>
+            <h6 className="dashboard-ops-title">Queued Tasks</h6>
+          </div>
+          <div className="dashboard-panel-kpis">
+            <div className="dashboard-panel-kpi">
+              <span className="dashboard-panel-kpi-label">Queued</span>
+              <span className="dashboard-panel-kpi-value">{queuedTasks.length}</span>
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="card-body">
-        <ul className="list-group" id="queued_tasks">
+      <div className="queued-task-card-body">
+        <ul className="list-group queued-task-list" id="queued_tasks">
           {queuedTasks.length === 0 ? (
             <li className="list-group-item border-0 p-4 mb-2 border-radius-lg text-center text-sm text-muted">
               <img
@@ -26,31 +37,31 @@ export default function QueuedTaskList({ queuedTasks }) {
             queuedTasks.map((task) => (
               <li
                 key={task.task_id}
-                className="list-group-item border-0 d-flex p-4 mb-2 bg-gray-100 border-radius-lg"
+                className="list-group-item border-0 d-flex p-4 mb-2 bg-gray-100 border-radius-lg queued-task-row"
               >
-                <div className="d-flex flex-column">
-                  <h6 className="mb-3 text-sm">{task.task_id}</h6>
-                  <span className="mb-2 text-xs">
+                <div className="d-flex flex-column queued-task-content">
+                  <h6 className="mb-3 text-sm queued-task-id">{task.task_id}</h6>
+                  <span className="mb-2 text-xs queued-task-line">
                     <i>n</i> GPUs:{" "}
                     <span className="text-dark font-weight-bold ms-sm-2">
                       {task.n_gpus}
                     </span>
                   </span>
-                  <span className="mb-2 text-xs">
+                  <span className="mb-2 text-xs queued-task-line">
                     Commands:{" "}
-                    <span className="text-dark ms-sm-2 font-weight-bold">
+                    <span className="text-dark ms-sm-2 font-weight-bold queued-task-value queued-task-value-long">
                       {task.command}
                     </span>
                   </span>
-                  <span className="text-xs">
+                  <span className="text-xs queued-task-line">
                     Envar:{" "}
-                    <span className="text-dark ms-sm-2 font-weight-bold">
+                    <span className="text-dark ms-sm-2 font-weight-bold queued-task-value queued-task-value-long">
                       {JSON.stringify(task.envar)}
                     </span>
                   </span>
                 </div>
 
-                <div className="ms-auto">
+                <div className="ms-auto queued-task-actions">
                   <button
                     className="btn btn-link p-2"
                     style={{ minWidth: "20px" }}

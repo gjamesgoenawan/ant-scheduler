@@ -33,56 +33,58 @@ function GpuToggleList({ data }) {
     }
   };
 
-  if (!data) return (
-    <div className="card bg-gradient-secondary worker-toggle-shell">
-      <div className="card worker-toggle-inner">
-        <div className="card-header pb-0 bg-transparent">
-          <h6>Worker Toggle</h6>
-        </div>
-      </div>
-    </div>);
+  const gpuNames = data?.monitor?.gpu_name || [];
+  const gpuAvailability = data?.monitor?.gpu_availability || [];
+  const enabledCount = enabled.filter(Boolean).length;
 
   return (
-    <div className="card bg-gradient-secondary worker-toggle-shell">
-      <div className="card worker-toggle-inner">
-        <div className="card-header pb-0 bg-transparent">
-          <h6>Worker Toggle</h6>
+    <div className="dashboard-ops-panel dashboard-worker-panel">
+      <div className="dashboard-ops-header">
+        <div>
+          <div className="dashboard-panel-eyebrow">Controls</div>
+          <h6 className="dashboard-ops-title">Worker Status</h6>
         </div>
-        <div className="card-body pt-1 worker-toggle-body">
-          <div className="worker-toggle-content">
-            <div className="text-center worker-toggle-scroll-shell">
-              <div className="d-flex justify-content-center align-items-center worker-toggle-grid-wrap">
-              <div className="row worker-toggle-grid">
-                {Array.from(
-                  { length: data.monitor.gpu_name.length },
-                  (_, i) => (
-                    <div key={i} className="col-6 my-1 px-1 worker-toggle-item">
-                      <div className="d-flex justify-content-between align-items-center border rounded p-2 worker-toggle-card">
-                        <span
-                          className={`worker-toggle-status-indicator ${data.monitor.gpu_availability[i] === 0 ? "bg-danger" : "bg-success"}`}
-                        ></span>
-                        
-                        <span className="worker-toggle-label">
-                          GPU {i} ({data.monitor.gpu_name[i]})
-                        </span>
-                        <div className="form-check form-switch">
-                          <input
-                            className="form-check-input"
-                            type="checkbox"
-                            id={`gpu-toggle-${i}`}
-                            checked={enabled[i]}
-                            onChange={() => toggleGpu(i)}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )
-                )}
-              </div>
-              </div>
-            </div>
+        <div className="dashboard-panel-kpis">
+          <div className="dashboard-panel-kpi">
+            <span className="dashboard-panel-kpi-label">Enabled</span>
+            <span className="dashboard-panel-kpi-value">{enabledCount} / {gpuNames.length}</span>
           </div>
         </div>
+      </div>
+
+      <div className="dashboard-worker-list">
+        {gpuNames.map((name, i) => {
+          const isAvailable = gpuAvailability[i] !== 0;
+          const isEnabled = !!enabled[i];
+
+          return (
+            <div key={i} className="dashboard-worker-row">
+              <div className="dashboard-worker-main">
+                <span className={`dashboard-worker-dot ${isAvailable ? "dashboard-worker-dot-ready" : "dashboard-worker-dot-busy"}`}></span>
+
+                <div className="dashboard-worker-copy">
+                  <div className="dashboard-worker-name">{`GPU ${i} · ${name}`}</div>
+                </div>
+              </div>
+
+              <div className="dashboard-worker-actions">
+                <span className={`dashboard-worker-enabled ${isEnabled ? "dashboard-worker-enabled-on" : "dashboard-worker-enabled-off"}`}>
+                  {isEnabled ? "Enabled" : "Disabled"}
+                </span>
+
+                <div className="form-check form-switch dashboard-worker-switch">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id={`gpu-toggle-${i}`}
+                    checked={isEnabled}
+                    onChange={() => toggleGpu(i)}
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

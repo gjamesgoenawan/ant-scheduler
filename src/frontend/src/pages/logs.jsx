@@ -107,13 +107,16 @@ function Logs() {
     <Layout pageTitle="Task Log">
       <div className="container-fluid py-2 logs-page">
         <div className="row mb-2">
-          <div className="card log-task-card">
+          <div className="log-task-card">
             
-            <div className="card-header pb-2 log-task-header">
-              <div className="d-flex justify-content-between align-items-center log-task-header-row">
-                <h5 className="mb-0 log-task-title">{taskId}</h5>
+            <div className="log-task-panel-header">
+              <div className="ongoing-task-panel-top log-task-header-row">
+                <div className="ongoing-task-header-copy log-task-header-copy">
+                  <div className="dashboard-panel-eyebrow">Task ID</div>
+                  <h6 className="dashboard-ops-title ongoing-task-title mb-0 log-task-title">{taskId}</h6>
+                </div>
 
-                <div className="d-flex align-items-center gap-1 log-task-actions">
+                <div className="ongoing-task-header-controls log-task-actions">
                   <button
                     className="btn btn-link text-dark p-2 mb-0"
                     title="Copy Command"
@@ -157,17 +160,17 @@ function Logs() {
             </div>
 
             {statusState === "loading" ? (
-                <div className="card-body">
+                <div className="log-task-panel-body">
                     <div className="alert alert-light text-center mb-4">Loading task details...</div>
                 </div>
             ) : taskNotFound ? (
-                <div className="card-body">
+                <div className="log-task-panel-body">
                     <div className="alert alert-light text-center mb-0">
                         Task ID <b>{taskId}</b> not found.
                     </div>
                 </div>
             ) : (
-                <div className="card-body px-4 pt-4 log-task-body">
+                <div className="log-task-panel-body">
               
                     <div className="bg-gray-100 rounded p-3 mb-4 log-task-summary" style={{ backgroundColor: "#f8f9fa" }}>
                       <div className="row">

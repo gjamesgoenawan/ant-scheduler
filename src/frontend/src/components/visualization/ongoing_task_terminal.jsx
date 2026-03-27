@@ -50,39 +50,46 @@ export default function OngoingTaskTerminal({
 
   return (
     <div className="row mb-4" key={task.task_id}>
-      <div className="card ongoing-task-card" id={`task-data-${idx}`}>
-        <div className="card-header pb-0" id={`task-id-${idx}`}>
-          <div className="d-flex align-items-center justify-content-between">
-            <a 
-              style={{ textTransform: 'none' }} 
-              href={`/logs?task_id=${task.task_id}`} 
-              target="_blank" 
-              rel="noopener noreferrer"
-            >
-              <h4 className="mb-0 mt-2 ongoing-task-title">{task.task_id}</h4>
-            </a>
-            <button
-              className="btn btn-link text-dark p-1 mb-0 d-flex align-items-center ongoing-task-mobile-toggle"
-              onClick={() => setShowDetails((current) => !current)}
-            >
-              <span className="text-xxs text-uppercase font-weight-bolder me-1">
-                {showDetails ? "Hide" : "Show"}
-              </span>
-              <i className="material-icons text-sm">
-                {showDetails ? "expand_less" : "expand_more"}
-              </i>
-            </button>
+      <div className="ongoing-task-card dashboard-ops-panel" id={`task-data-${idx}`}>
+        <div className="ongoing-task-panel-header" id={`task-id-${idx}`}>
+          <div className="ongoing-task-panel-top">
+            <div className="ongoing-task-header-copy">
+              <div className="dashboard-panel-eyebrow">Task ID</div>
+              <a
+                className="ongoing-task-link"
+                style={{ textTransform: "none" }}
+                href={`/logs?task_id=${task.task_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <h6 className="dashboard-ops-title ongoing-task-title mb-0">{task.task_id}</h6>
+              </a>
+            </div>
+
+            <div className="ongoing-task-header-controls">
+              <button
+                className="btn btn-link text-dark p-1 mb-0 d-flex align-items-center ongoing-task-mobile-toggle"
+                onClick={() => setShowDetails((current) => !current)}
+              >
+                <span className="text-xxs text-uppercase font-weight-bolder me-1">
+                  {showDetails ? "Hide" : "Show"}
+                </span>
+                <i className="material-icons text-sm">
+                  {showDetails ? "expand_less" : "expand_more"}
+                </i>
+              </button>
+            </div>
           </div>
         </div>
-        <div className="card-body">
+        <div className="ongoing-task-panel-body">
           <div className="bg-gray-100 rounded p-3 ongoing-task-details-shell" style={{ backgroundColor: "#f8f9fa" }}>
             <div
               className={`ongoing-task-summary ${showDetails ? "mb-3" : "mb-0"}`}
             >
               <div className="row">
                 <div className="col-md-4 col-6 mb-3">
-                  <span className="text-xs font-weight-bold text-secondary text-uppercase">Status</span>
-                  <p className="text-sm text-info font-weight-bold mb-0">Running</p>
+                  <span className="text-xs font-weight-bold text-secondary text-uppercase">Start Time</span>
+                  <p className="text-sm text-dark font-weight-bold mb-0">{task.time?.start || "-"}</p>
                 </div>
 
                 <div className="col-md-4 col-6 mb-3">
