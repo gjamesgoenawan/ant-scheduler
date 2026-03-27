@@ -94,6 +94,21 @@ const TaskRow = ({
                 {task.task_id}
               </a>
             </div>
+
+            <button
+              className="completed-task-details-btn-mobile btn btn-link text-dark p-1 mb-0 d-flex align-items-center ongoing-task-mobile-toggle"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsExpanded(!isExpanded);
+              }}
+            >
+              <span className="text-xxs text-uppercase font-weight-bolder">
+                {isExpanded ? "Hide" : "Show"}
+              </span>
+              <i className="material-icons text-sm ms-1">
+                {isExpanded ? "expand_less" : "expand_more"}
+              </i>
+            </button>
         </div>
 
         <div
@@ -147,7 +162,7 @@ const TaskRow = ({
           </div>
 
           <button
-            className="completed-task-details-btn btn btn-link text-dark p-1 mb-0 d-flex align-items-center ongoing-task-mobile-toggle"
+            className="completed-task-details-btn completed-task-details-btn-desktop btn btn-link text-dark p-1 mb-0 d-flex align-items-center ongoing-task-mobile-toggle"
             onClick={(e) => {
               e.stopPropagation();
               setIsExpanded(!isExpanded);
@@ -207,6 +222,7 @@ export default function CompletedTasks() {
   const [completedTasks, setCompletedTasks] = useState([]);
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (data?.task_completed) {
@@ -248,6 +264,11 @@ export default function CompletedTasks() {
     await bulkDeleteTasks(selectedTaskIds, addToast);
   };
 
+  const normalizedSearchQuery = searchQuery.toLowerCase();
+  const filteredTasks = completedTasks.filter((task) =>
+    task.task_id.toLowerCase().includes(normalizedSearchQuery)
+  );
+
   return (
     <Layout pageTitle="Completed Tasks">
       <div className="container-fluid py-2 completed-task-page">
@@ -262,11 +283,11 @@ export default function CompletedTasks() {
               >
                 <div
                   className="completed-task-toolbar-status d-flex align-items-center gap-3"
-                  style={{ flex: "0 0 140px", minWidth: "140px" }}
+                  style={{ flex: "0 0 auto", minWidth: 0 }}
                 >
                   {isSelectMode ? (
                     <div
-                      className="d-inline-flex align-items-center gap-2"
+                      className="completed-task-selected-chip completed-task-selected-chip-mobile d-inline-flex align-items-center gap-2"
                       style={{
                         padding: "0.3rem 0.65rem",
                         borderRadius: "999px",
@@ -281,11 +302,6 @@ export default function CompletedTasks() {
                       </span>
                     </div>
                   ) : null}
-                  {!isSelectMode ? (
-                    <span className="completed-task-toolbar-label text-xxs text-uppercase text-secondary font-weight-bolder opacity-7 mb-0">
-                      Bulk actions
-                    </span>
-                  ) : null}
                 </div>
 
                 <div
@@ -294,6 +310,21 @@ export default function CompletedTasks() {
                 >
                   {isSelectMode ? (
                     <>
+                      <div
+                        className="completed-task-selected-chip completed-task-selected-chip-desktop d-inline-flex align-items-center gap-2"
+                        style={{
+                          padding: "0.3rem 0.65rem",
+                          borderRadius: "999px",
+                          backgroundColor: "#f8f9fa",
+                          color: "#6c757d",
+                          border: "1px solid #e9ecef",
+                        }}
+                      >
+                        <i className="material-icons" style={{ fontSize: "14px" }}>checklist</i>
+                        <span className="text-xxs font-weight-bold mb-0 text-uppercase">
+                          {selectedTaskIds.length} selected
+                        </span>
+                      </div>
                       <button
                         className="btn btn-link text-dark p-1 mb-0 d-flex align-items-center gap-1"
                         disabled={selectedTaskIds.length === 0}
@@ -301,7 +332,7 @@ export default function CompletedTasks() {
                         title="Download Selected"
                       >
                         <i className="material-icons" style={{ fontSize: "16px" }}>save_alt</i>
-                        <span className="text-xxs text-uppercase font-weight-bolder">Download Selected</span>
+                        <span className="text-xxs text-uppercase font-weight-bolder">Download</span>
                       </button>
                       <button
                         className="btn btn-link text-dark p-1 mb-0 d-flex align-items-center gap-1"
@@ -310,7 +341,7 @@ export default function CompletedTasks() {
                         title="Restart Selected"
                       >
                         <i className="material-icons" style={{ fontSize: "16px" }}>restart_alt</i>
-                        <span className="text-xxs text-uppercase font-weight-bolder">Restart Selected</span>
+                        <span className="text-xxs text-uppercase font-weight-bolder">Restart</span>
                       </button>
                       <button
                         className="btn btn-link text-danger p-1 mb-0 d-flex align-items-center gap-1"
@@ -319,7 +350,7 @@ export default function CompletedTasks() {
                         title="Delete Selected"
                       >
                         <i className="material-icons" style={{ fontSize: "16px" }}>delete_outline</i>
-                        <span className="text-xxs text-uppercase font-weight-bolder">Delete Selected</span>
+                        <span className="text-xxs text-uppercase font-weight-bolder">Delete</span>
                       </button>
                       <button
                         className="btn btn-link text-secondary p-1 mb-0 d-flex align-items-center gap-1"
@@ -327,12 +358,12 @@ export default function CompletedTasks() {
                         title="Clear Selection"
                       >
                         <i className="material-icons" style={{ fontSize: "16px" }}>close</i>
-                        <span className="text-xxs text-uppercase font-weight-bolder">Clear Selection</span>
+                        <span className="text-xxs text-uppercase font-weight-bolder">Clear</span>
                       </button>
                     </>
                   ) : (
                     <button
-                      className="completed-task-select-btn btn btn-light btn-sm mb-0 d-flex align-items-center gap-1"
+                      className="completed-task-select-btn btn btn-link text-dark p-1 mb-0 d-flex align-items-center gap-1"
                       onClick={enterSelectMode}
                       title="Select"
                     >
@@ -340,6 +371,19 @@ export default function CompletedTasks() {
                       <span className="text-xxs text-uppercase font-weight-bolder">Select</span>
                     </button>
                   )}
+                </div>
+
+                <div className="completed-task-toolbar-search">
+                  <div className="completed-task-search-shell d-flex align-items-center">
+                    <i className="material-icons completed-task-search-icon">search</i>
+                    <input
+                      type="text"
+                      className="completed-task-search-input"
+                      placeholder="Search tasks"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -352,14 +396,14 @@ export default function CompletedTasks() {
             </div>
 
             <div className="card-body p-0">
-              {completedTasks.length === 0 ? (
+              {filteredTasks.length === 0 ? (
                   <div className="text-center py-4 text-muted">No completed tasks found.</div>
               ) : (
-                  completedTasks.map((task, idx) => (
+                  filteredTasks.map((task, idx) => (
                   <TaskRow 
                       key={task.task_id} 
                       task={task} 
-                      isLast={idx === completedTasks.length - 1}
+                      isLast={idx === filteredTasks.length - 1}
                       isSelectMode={isSelectMode}
                       isSelected={selectedTaskIds.includes(task.task_id)}
                       onToggleSelect={toggleTaskSelection}

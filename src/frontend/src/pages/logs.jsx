@@ -149,7 +149,7 @@ function Logs() {
                     }
                   >
                     <i className="material-icons text-lg">
-                      {statusState === "running" ? "stop_circle" : "delete_outline"}
+                      {statusState === "running" ? "cancel" : "delete_outline"}
                     </i>
                   </button>
                 </div>
@@ -220,7 +220,7 @@ function Logs() {
                       className="bg-black text-light p-3 rounded log-output-shell" 
                       style={{ minHeight: "300px" }}
                     >
-                      <pre className="log-output-pre" style={{ margin: 0, whiteSpace: "pre-wrap" }}>{logs || "Failed to load Log."}</pre>
+                      <pre className="log-output-pre" style={{ margin: 0, whiteSpace: "pre" }}>{logs || "Failed to load Log."}</pre>
                     </div>
 
                 </div>

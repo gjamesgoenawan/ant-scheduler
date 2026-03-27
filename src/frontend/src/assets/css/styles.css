@@ -18285,16 +18285,23 @@ Icon colors
     align-self: center;
   }
 
-  .completed-task-select-btn,
-  .completed-task-select-btn:hover,
-  .completed-task-select-btn:focus,
-  .completed-task-select-btn:active {
-    background-color: #fff !important;
-    border-color: #e2e8f0 !important;
-    color: #344767 !important;
+  .completed-task-details-btn-mobile {
+    display: none !important;
+  }
+
+  .completed-task-selected-chip-mobile {
+    display: none !important;
+  }
+
+  .completed-task-selected-chip-desktop {
+    display: inline-flex !important;
+  }
+
+  .completed-task-select-btn {
     box-shadow: none !important;
-    opacity: 1 !important;
     transform: none !important;
+    transition: none !important;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .app-shell {
@@ -18310,6 +18317,54 @@ Icon colors
   .completed-task-toolbar {
     margin-left: 0rem;
     margin-right: 0rem;
+    justify-content: flex-start !important;
+    gap: 0.75rem;
+  }
+
+  .completed-task-toolbar-status {
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
+  }
+
+  .completed-task-toolbar-actions {
+    justify-content: flex-start !important;
+  }
+
+  .completed-task-toolbar-search {
+    margin-left: auto;
+    flex: 0 0 260px;
+    max-width: 260px;
+  }
+
+  .completed-task-search-shell {
+    width: 100%;
+    min-height: 36px;
+    padding: 0 0.8rem;
+    border: 1px solid #e9ecef;
+    border-radius: 0.7rem;
+    background: #fff;
+    box-shadow: none;
+  }
+
+  .completed-task-search-icon {
+    font-size: 16px !important;
+    color: #6c757d;
+    margin-right: 0.45rem;
+  }
+
+  .completed-task-search-input {
+    width: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #344767;
+    font-size: 0.75rem;
+    font-weight: 400;
+  }
+
+  .completed-task-search-input::placeholder {
+    color: #9aa4b2;
+    font-weight: 400;
   }
 
   .log-task-title {
@@ -18336,6 +18391,15 @@ Icon colors
     width: 100%;
   }
 
+  .log-output-shell {
+    overflow-x: auto;
+    overflow-y: auto;
+  }
+
+  .log-output-pre {
+    min-width: max-content;
+  }
+
   @media (max-width: 991.98px) {
     .completed-task-toolbar {
       align-items: flex-start !important;
@@ -18353,6 +18417,18 @@ Icon colors
       width: 100%;
       justify-content: flex-start !important;
       flex-wrap: wrap;
+    }
+
+    .completed-task-selected-chip-mobile {
+      display: inline-flex !important;
+    }
+
+    .completed-task-selected-chip-desktop {
+      display: none !important;
+    }
+
+    .completed-task-toolbar-search {
+      display: none !important;
     }
 
     .completed-task-columns {
@@ -18489,6 +18565,43 @@ Icon colors
       padding: 0 !important;
     }
 
+    .completed-task-toolbar {
+      display: flex !important;
+      flex-direction: row !important;
+      flex-wrap: wrap;
+      align-items: center !important;
+      gap: 0.5rem;
+    }
+
+    .completed-task-toolbar-search {
+      display: block !important;
+      order: 1;
+      flex: 0 0 100%;
+      max-width: 100%;
+      margin-left: 0;
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    .completed-task-toolbar-status {
+      order: 2;
+      width: auto !important;
+      flex: 0 0 auto !important;
+      padding-left: 1rem;
+      padding-right: 0;
+    }
+
+    .completed-task-toolbar-actions {
+      order: 3;
+      width: auto;
+      flex: 1 1 auto !important;
+      justify-content: flex-start !important;
+      flex-wrap: nowrap;
+      padding-left: 0;
+      min-width: 0;
+      overflow-x: auto;
+    }
+
     .log-task-card {
       background: #fff !important;
       box-shadow: 0 0 1.25rem rgba(15, 23, 42, 0.08) !important;
@@ -18595,7 +18708,6 @@ Icon colors
     .log-output-pre {
       font-size: 12px;
       line-height: 1.4;
-      overflow-wrap: anywhere;
     }
 
     .completed-task-row {
@@ -18605,6 +18717,10 @@ Icon colors
     .completed-task-meta {
       gap: 0.75rem !important;
       align-items: flex-start !important;
+    }
+
+    .completed-task-selector {
+      margin-left: 1rem;
     }
 
     .completed-task-link {
@@ -18617,15 +18733,19 @@ Icon colors
     }
 
     .completed-task-actions {
+      display: flex !important;
+      flex-direction: column;
       align-items: center !important;
       justify-content: flex-end !important;
       width: 100%;
       margin-top: 0.5rem;
       margin-left: 0 !important;
       flex-shrink: 1 !important;
+      gap: 0.35rem;
     }
 
     .completed-task-action-icons {
+      order: 2;
       justify-content: flex-end;
       width: auto;
       flex-wrap: wrap;
@@ -18639,8 +18759,21 @@ Icon colors
     }
 
     .completed-task-details-btn {
+      order: 1;
+      align-self: flex-end;
       width: auto;
       justify-content: flex-end;
+    }
+
+    .completed-task-details-btn-mobile {
+      display: inline-flex !important;
+      margin-left: auto;
+      flex-shrink: 0;
+      align-self: flex-start;
+    }
+
+    .completed-task-details-btn-desktop {
+      display: none !important;
     }
 
     .completed-task-shell .border-bottom {
@@ -18648,33 +18781,37 @@ Icon colors
     }
 
     .completed-task-toolbar {
+      align-items: flex-start !important;
+      flex-direction: column;
+      gap: 0.45rem;
       padding-left: 0 !important;
       padding-right: 0 !important;
-      padding-bottom: 0.5rem !important;
-      margin-bottom: 0.5rem !important;
+      padding-bottom: 0.0rem !important;
+      margin-bottom: 0.0rem !important;
 
     }
 
     .completed-task-toolbar-status {
       min-width: 0 !important;
       flex: 1 1 auto !important;
+      padding-left: 1rem;
     }
 
     .completed-task-toolbar-actions {
       min-width: 0;
+      width: 100%;
+      justify-content: flex-start !important;
+      flex-wrap: wrap;
+      padding-left: 1rem;
     }
 
     .completed-task-toolbar-label {
       display: none !important;
     }
 
-    .completed-task-select-btn {
-      background: #fff !important;
-      border: 1px solid #e2e8f0 !important;
-      color: #344767 !important;
-      border-radius: 0.6rem !important;
-      padding: 0.45rem 0.75rem !important;
-      box-shadow: none !important;
+    .completed-task-toolbar-search {
+      margin-bottom: 0.0rem !important;
+
     }
 
     .completed-task-columns {
@@ -18753,6 +18890,7 @@ Icon colors
     .ongoing-task-mobile-toggle {
       padding: 0.15rem 0 !important;
       min-height: auto !important;
+      margin-left: 0.3rem !important;
     }
 
     .ongoing-task-summary {
