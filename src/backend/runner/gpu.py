@@ -178,7 +178,7 @@ class gpu_runner(base_runner):
             
             elif _t.task_id in current_queue_list:
                 self.logger.error(f"Duplicate Task ID '{_t.task_id}' detected in the submitted queue.")
-                message.append(f"Duplicate entry: Detected duplicate Task ID '{_t.task_id}' in the submitted queue.")
+                message.append(f"Duplicate entry: Submitted queue has duplicate '{_t.task_id}'")
                 success.append(False)
 
             else:
@@ -631,8 +631,24 @@ class gpu_runner(base_runner):
                         'message' : f'Unrecognized queue mode. Got : {queue_mode}'}
         
             status = self.add_task_to_queue(tasks, allow_partial=[False] * len(tasks))
-            result = {'status' : 'success' if all([_i[0] for _i in status]) else 'error',
-                      'message': status[0][1] if len(status) == 1 else "Tasks Created!"}
+            all_succeeded = all([_i[0] for _i in status])
+
+            if len(status) == 1:
+                message = status[0][1]
+            else:
+                if all_succeeded:
+                    message = "Tasks Created!"
+                else:
+                    failed_messages = [msg for ok, msg in status if not ok]
+                    if queue_mode == "multi":
+                        message = [
+                            *failed_messages,
+                        ]
+                    else:
+                        message = failed_messages if failed_messages else "Failed to create one or more tasks."
+
+            result = {'status' : 'success' if all_succeeded else 'error',
+                      'message': message}
             return result
     
         except Exception as e:
