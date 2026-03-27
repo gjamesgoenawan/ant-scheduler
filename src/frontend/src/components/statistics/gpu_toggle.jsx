@@ -34,10 +34,8 @@ function GpuToggleList({ data }) {
   };
 
   if (!data) return (
-    <div className="card bg-gradient-secondary"  style={{ width: '100%', 
-                                                          height: '100%' }}>
-      <div className="card"  style={{ width: '100%', 
-                                      height: '100%' }}>
+    <div className="card bg-gradient-secondary worker-toggle-shell">
+      <div className="card worker-toggle-inner">
         <div className="card-header pb-0 bg-transparent">
           <h6>Worker Toggle</h6>
         </div>
@@ -45,53 +43,26 @@ function GpuToggleList({ data }) {
     </div>);
 
   return (
-    <div className="card bg-gradient-secondary" style={{ width: '100%', 
-                                                         height: '100%' }}>
-      <div className="card" style={{ width: '100%', 
-                                     height: '100%' }}>
+    <div className="card bg-gradient-secondary worker-toggle-shell">
+      <div className="card worker-toggle-inner">
         <div className="card-header pb-0 bg-transparent">
           <h6>Worker Toggle</h6>
         </div>
-        <div className="card-body pt-1" 
-          style={{ width: '100%', 
-                   height: '100px', }}>
-          <div
-            style={{ height: '100%',}}
-          >
-            <div className="text-center" 
-              style={{ width: '98%', 
-                       height: '100%', 
-                       overflowY: "scroll", 
-                       position: "relative", 
-                       margin: "0 auto"}}>
-              <div className="d-flex justify-content-center align-items-center"
-                style={{ 
-                  minHeight: "100%",
-                  width: "100%",
-                  overflowY: "auto",
-                }}
-              >
-              <div className="row"
-               style={{ 
-                  width: "100%",
-                  position: "relative",
-                  margin: "0 auto"
-                }}>
+        <div className="card-body pt-1 worker-toggle-body">
+          <div className="worker-toggle-content">
+            <div className="text-center worker-toggle-scroll-shell">
+              <div className="d-flex justify-content-center align-items-center worker-toggle-grid-wrap">
+              <div className="row worker-toggle-grid">
                 {Array.from(
                   { length: data.monitor.gpu_name.length },
                   (_, i) => (
-                    <div key={i} className="col-6 my-1 px-1">
-                      <div className="d-flex justify-content-between align-items-center border rounded p-2" style={{ fontSize: '10pt' }}>
-                        <span className={
-                            data.monitor.gpu_availability[i] === 0 ? "bg-danger" : "bg-success"
-                          }
-                          style={{
-                            width: "4px",
-                            height: "10px",
-                            marginRight: "1px"
-                          }}></span>
+                    <div key={i} className="col-6 my-1 px-1 worker-toggle-item">
+                      <div className="d-flex justify-content-between align-items-center border rounded p-2 worker-toggle-card">
+                        <span
+                          className={`worker-toggle-status-indicator ${data.monitor.gpu_availability[i] === 0 ? "bg-danger" : "bg-success"}`}
+                        ></span>
                         
-                        <span>
+                        <span className="worker-toggle-label">
                           GPU {i} ({data.monitor.gpu_name[i]})
                         </span>
                         <div className="form-check form-switch">

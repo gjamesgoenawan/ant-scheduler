@@ -82,7 +82,7 @@ const showCreateSuccessToast = () => {
 
   return (
     <Layout pageTitle="Create New Task" maxToasts={2}>
-      <div className="container-fluid py-2">
+      <div className="container-fluid py-2 create-task-page">
         <div className="row">
           {/* Task Form */}
           <div className="card mb-4">
@@ -107,16 +107,10 @@ const showCreateSuccessToast = () => {
           </div>
         </div>
         <div className="row mb-4">
-          <div className="col-lg-6 col-md-6"
-            style={{ paddingLeft: '0px',
-                    paddingRight: '0.75rem',
-                    height: '250px'}}>
+          <div className="col-lg-6 col-md-6 create-task-status-col">
             <TaskStatus data={data} />
           </div>
-          <div className="col-lg-6 col-md-6"
-            style={{ paddingLeft: '0.75 rem',
-                    paddingRight: '0px',
-                    height: '250px'}}>
+          <div className="col-lg-6 col-md-6 create-task-toggle-col">
             <GpuToggleList data={data} /> 
           </div>
         </div>
