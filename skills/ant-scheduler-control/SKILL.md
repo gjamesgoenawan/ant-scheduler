@@ -1,5 +1,5 @@
 ---
-name: ant-mission-control
+name: ant-scheduler-control
 description: Use when the user wants Codex to interact with ANT Scheduler, the GPU job scheduler at github.com/gjamesgoenawan/ant-scheduler, to launch, monitor, and inspect research ML or deep-learning runs. Use it for GPU training jobs, no-GPU jobs, project default runner setup in .ant-scheduler/env, queue or running status checks, limited log reads, and full log path lookup through the bundled helper scripts.
 ---
 
