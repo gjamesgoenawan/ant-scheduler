@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=./common.sh
+source "${SCRIPT_DIR}/common.sh"
+
 if [[ "${1:-}" == "--help" || "$#" -lt 3 ]]; then
   cat <<'EOF'
 Usage:
   create_task.sh <task_id> <n_gpus> <command>
 
 Environment overrides:
-  RUNNER_URL       Default: http://localhost:5000
-  ANT_CONDA_ENV    Optional: set runner ant_conda_env
-  ANT_CONDA_PATH   Optional: set runner ant_conda_path
+  ANT_SCHEDULER_URL  Project default from .ant-scheduler/env
+  ANT_CONDA_ENV      Project default from .ant-scheduler/env
+  ANT_CONDA_PATH     Project default from .ant-scheduler/env
   ANT_WD           Optional: set runner ant_wd
   QUEUE_MODE       Default: single
 
@@ -22,11 +26,10 @@ fi
 TASK_ID="$1"
 N_GPUS="$2"
 COMMAND="$3"
-RUNNER_URL="${RUNNER_URL:-http://localhost:5000}"
-ANT_CONDA_ENV="${ANT_CONDA_ENV:-}"
-ANT_CONDA_PATH="${ANT_CONDA_PATH:-}"
 ANT_WD="${ANT_WD:-}"
 QUEUE_MODE="${QUEUE_MODE:-single}"
+
+require_ant_scheduler_defaults
 
 jq -n \
   --arg task_id "$TASK_ID" \
@@ -53,5 +56,5 @@ jq -n \
       --header "Content-Type: application/json" \
       --request POST \
       --data @- \
-      "${RUNNER_URL}/create_task"
+      "${ANT_SCHEDULER_URL}/create_task"
 echo

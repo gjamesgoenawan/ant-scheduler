@@ -2,6 +2,7 @@ cert/
 ant_runner_logs/
 *.ipynb
 *.code-workspace
+.ant-scheduler
 thingstodo
 __pycache__
 

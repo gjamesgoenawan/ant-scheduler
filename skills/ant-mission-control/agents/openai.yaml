@@ -1,4 +1,4 @@
 version: 1
 display_name: ANT Mission Control
-short_description: Submit and monitor local ANT runner jobs
-default_prompt: Launch or monitor jobs on the local ANT runner using the bundled helper scripts.
+short_description: Operate ANT Scheduler for ML and deep-learning experiment runs
+default_prompt: Set project ANT defaults, then launch or monitor ANT Scheduler jobs using the bundled helper scripts.

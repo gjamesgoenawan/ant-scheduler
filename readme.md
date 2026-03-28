@@ -134,6 +134,3 @@ Enable this behavior by setting `ADGS_enabled=true` in your config. This feature
 
 ## Acknowledgement
 Web Template: [Creative Tim](https://www.creative-tim.com/product/material-dashboard).
-
-
-
