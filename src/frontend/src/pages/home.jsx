@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Layout from "../components/layout/layout";
 import TaskStatus from "../components/statistics/task_status";
 import GpuToggleList from "../components/statistics/gpu_toggle";
+import { getTaskSummary } from "../utils/taskSummary";
 import { useMonitorData } from "../App";
 
 import {
@@ -292,9 +293,10 @@ export default function Home() {
   const ramUsage = latestMetricValue(monitor?.ram_usage, 0);
   const ramTotal = monitor?.ram_total || 0;
   const ramUsagePercent = ramTotal > 0 ? (ramUsage / ramTotal) * 100 : 0;
-  const queuedCount = data?.task_queue?.length || 0;
-  const runningCount = data?.task_ongoing?.length || 0;
-  const completedCount = data?.task_completed?.length || 0;
+  const taskSummary = getTaskSummary(data);
+  const queuedCount = taskSummary.queued;
+  const runningCount = taskSummary.running;
+  const completedCount = taskSummary.completed;
   const gpuCards = (monitor?.gpu_name || []).map((name, index) => {
     const gpuUsage = latestMetricValue(monitor?.gpu_usage?.[index], 0);
     const gpuMemory = latestMetricValue(monitor?.gpu_memory?.[index], 0);

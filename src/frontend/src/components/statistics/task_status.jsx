@@ -1,13 +1,15 @@
 import React from "react";
 import { Link } from 'react-router-dom'; 
+import { getTaskSummary } from "../../utils/taskSummary";
 
 export default function TaskStatus({ data }) {
+  const summary = getTaskSummary(data);
   const items = [
-    { key: "queued", label: "Queued", count: data?.task_queue?.length || 0, to: "/create_task" },
-    { key: "running", label: "Running", count: data?.task_ongoing?.length || 0, to: "/ongoing_task" },
-    { key: "completed", label: "Completed", count: data?.task_completed?.length || 0, to: "/completed_task" },
+    { key: "queued", label: "Queued", count: summary.queued, to: "/create_task" },
+    { key: "running", label: "Running", count: summary.running, to: "/ongoing_task" },
+    { key: "completed", label: "Completed", count: summary.completed, to: "/completed_task" },
   ];
-  const totalTasks = items.reduce((sum, item) => sum + item.count, 0);
+  const totalTasks = summary.tracked;
 
   return (
     <div className="dashboard-ops-panel dashboard-task-panel">

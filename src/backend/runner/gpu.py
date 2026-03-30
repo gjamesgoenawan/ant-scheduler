@@ -346,7 +346,11 @@ class gpu_runner(base_runner):
         result = {}
 
         # task queue
-        result['task_queue'] = [_k.todict() for _k in self.loader.get_queue()]
+        result['task_queue'] = []
+        for _k in self.loader.get_queue():
+            d = _k.todict()
+            d['state'] = 'queued'
+            result['task_queue'].append(d)
         
         # task ongoing, put into dicts and inject console_out from handler.
         handler_vis = self.handler.vis()
@@ -361,12 +365,24 @@ class gpu_runner(base_runner):
                 self.logger.error(f"Got {e.__class__} in vis(). Skipping parsing of console_out. Reason: {e}")
                 console_out = []
             d['console_out'] = console_out
+            d['state'] = 'running'
             result['task_ongoing'].append(d)
         
         # task finished
         arg = dict(include_time=['start', 'runtime'],
                    formatted=True)
-        result['task_completed'] = [_k.todict(**arg) for _k in self.task_completed] 
+        
+        result['task_completed'] = []
+        for _k in self.task_completed:
+            d = _k.todict(**arg)
+            d['state'] = 'completed'
+            result['task_completed'].append(d)
+
+        result['summary'] = {
+            'queued': len(result['task_queue']),
+            'running': len(result['task_ongoing']),
+            'completed': len(result['task_completed']),
+        }
 
         # monitors
         result['monitor'] = self.monitor.current_stats
