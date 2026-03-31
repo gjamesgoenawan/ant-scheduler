@@ -1,0 +1,4 @@
+version: 1
+display_name: ANT Mission Control
+short_description: Operate ANT Scheduler for ML and deep-learning experiment runs
+default_prompt: Set project ANT defaults, then launch or monitor ANT Scheduler jobs using the bundled helper scripts.

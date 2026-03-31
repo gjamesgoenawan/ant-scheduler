@@ -1,6 +1,12 @@
-<center> <h1>ANT: GPU Scheduler</h1> </center>
+<center> <h1>ANT: Job Scheduler</h1> </center>
 
 ![ANT Scheduler](./asset/screenshot.png)
+
+<div style="display: flex;">
+  <img src="./asset/ongoing_task.png" alt="Ongoing Task Page" style="width: 50%; padding-right: 5px;">
+  <img src="./asset/completed_task.png" alt="Completed Task Page" style="width: 50%; padding-left: 5px;">
+</div>
+
 Currently, ANT supports single-node multi-GPU settings, with multi-node support planned for future development.
 
 The primary objective of ANT is to efficiently schedule jobs and allocate the requested GPU resources.
@@ -27,14 +33,14 @@ bash setup.sh
 ### Launching
 Finally, launch ANT using:
 ```
-python run.sh [gpu_ids separated by comma]
+python run.py [gpu_ids separated by comma]
 
 # Example (Selecting the first 4 GPUs):
 python run.py  0,1,2,3
 ```
 By default, this will load the configuration from `config/default.json` and host a web interface at `https://0.0.0.0:6060`. The backend status can be checked by curling as follows:
 ```
-curl --insecure https://0.0.0.0:6060/api
+curl --insecure https://0.0.0.0:6060/api/
 ```
 
 ### Test Run 
@@ -56,6 +62,34 @@ ANT supports any single-line command. For sequential execution of multiple comma
 cd /path/to/my/project && conda run --live-stream -n my_env python ...
 ```
 Note that `--live-stream` is necessary for the `conda run` to live-stream the output to stdout. Otherwise, no output will be printed.
+
+## Agentic Coding Tools Support
+
+ANT provides built-in support for agentic coding tools like Codex, Claude Code, or similar AI assistants. These tools can interact with ANT Scheduler programmatically to launch, monitor, and control your tasks without manual web interface interaction.
+
+### Setup with Agentic Tools
+
+To enable agentic tool integration:
+
+1. Ask your agentic coding tool to read the `skills/ant-scheduler-control` directory in this repository.
+2. The agent will automatically set up the necessary project configurations and provide commands to interact with ANT.
+
+For example, you can instruct your agent:
+- "Read skills/ant-scheduler-control and set up ANT Scheduler for my project"
+- "Use ANT Mission Control to launch a GPU training job with these parameters"
+
+### What the Agent Can Do
+
+Once configured, the agent can:
+- Set up project defaults (ANT URL, conda environment, etc.)
+- Launch new tasks with GPU allocation
+- Monitor task status (queued, running, completed)
+- Control tasks (restart, terminate, remove from queue)
+- Manage GPU availability
+- Retrieve logs and task information
+- Perform health checks on the ANT scheduler
+
+The skill includes helper scripts for all these operations, making it easy for agents to automate your ML training workflows.
 
 ## Advanced
 #### Built-in RNG
@@ -124,7 +158,7 @@ Enable this behavior by setting `ADGS_enabled=true` in your config. This feature
 ## Changelog:
 | Version | Changelogs |
 | -       | -          |
-| 1.0.2 (current)   | - [redesign] redesign dashboard.<br>[new feature] search bar in completed tasks<br>[new feature] webui is now mobile<br>[new feature] Agent (codex) integration. ask your favourite agent to read and install `./skills`.<br>- [new feature] Added full_log flag to /get_log, allowing user to request full raw logs when needed.<br>- [new feature] Added bulk actions in Completed Task (select, bulk delete, bulk restart, bulk download log).<br>- Improved general UI readability.<br>- Fixed several frontend layout bugs and overflow issues across desktop/mobile views.<br>- Fixed several bugs on backend log parsing.<br>- Fixed wrong toast on multi-queue mode<br> |
+| 1.0.2 (current)   | - [redesign] redesign dashboard.<br>- [new feature] search bar in completed tasks<br>- [new feature] webui is now mobile<br>- [new feature] Agent (codex) integration. ask your favourite agent to read and install `./skills`.<br>- [new feature] Added full_log flag to /get_log, allowing user to request full raw logs when needed.<br>- [new feature] Added bulk actions in Completed Task (select, bulk delete, bulk restart, bulk download log).<br>- Improved general UI readability.<br>- Fixed several frontend layout bugs and overflow issues across desktop/mobile views.<br>- Fixed several bugs on backend log parsing.<br>- Fixed wrong toast on multi-queue mode<br> |
 | 1.0.1 | - [new feature] Improved Copy Command. Now copied the properties as well, (n_gpus, task_id, envar)<br>- [new feature] Added task restart button.<br>- Patched directory traversal attack on `task_id`<br>- Fixed several frontend bugs (text-overflow and wrong error message)<br>- Frontend task actions (copy, delete, kill, etc) refactor and cleanup (toasts) |
 | 1.0.0 | - Massive rewrite.<br>- Switched to react.js frontend.<br>- Reimplement backend as a REST API & improved stability.<br>- Added GPU Toggle to disable specific GPUs.<br>- Added Environment Variable editor & its custom functions.<br>- Added `monitor` component that polls hardware info & status in an async manner. Deprecated `sysinfo.py`<br>- Added `AntTask` structure for tasks allowing seamless and integrated property tracking (time taken, envar, etc).<br>- Added launcher `run.py` to start & restart frontend & backend.<br>- Redesigned `Completed Task` page. It's actually practical now.<br>- fixed random bugs & added more safeguards (e.g. removing illegal characters in `task_id`, rejecting duplicate `task_id`, etc)<br>- Bunch of new QoL (e.g. more detailed message in toasts, etc.) |
 |0.3.1 | - Now host HTTP and HTTPS server with proper redirecting. <br> - Deprecated `port` argument & replaced it with `port_http` & `port_https` <br> - Implemented faster log truncation algorithm to prevent unresponsive webserver. |
