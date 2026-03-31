@@ -89,6 +89,16 @@ function getOrCreateChartTooltip(chart) {
   return tooltipEl;
 }
 
+function hideChartTooltip(doc = document) {
+  const tooltipEl = doc.body.querySelector(".dashboard-chart-tooltip");
+  if (!tooltipEl) return;
+  if (tooltipEl.__hideTimeoutId) {
+    clearTimeout(tooltipEl.__hideTimeoutId);
+    tooltipEl.__hideTimeoutId = null;
+  }
+  tooltipEl.style.opacity = "0";
+}
+
 function externalChartTooltipHandler(context) {
   const { chart, tooltip } = context;
   const tooltipEl = getOrCreateChartTooltip(chart);
@@ -99,6 +109,11 @@ function externalChartTooltipHandler(context) {
   if (!tooltip || tooltip.opacity === 0) {
     tooltipEl.style.opacity = "0";
     return;
+  }
+
+  if (tooltipEl.__hideTimeoutId) {
+    clearTimeout(tooltipEl.__hideTimeoutId);
+    tooltipEl.__hideTimeoutId = null;
   }
 
   const title = tooltip.title?.[0] || "";
@@ -321,6 +336,22 @@ export default function Home() {
   });
 
   useEffect(() => {
+    const hideTooltip = () => hideChartTooltip(document);
+
+    window.addEventListener("scroll", hideTooltip, true);
+    window.addEventListener("touchcancel", hideTooltip, { passive: true });
+    window.addEventListener("pointerup", hideTooltip, { passive: true });
+    window.addEventListener("resize", hideTooltip);
+
+    return () => {
+      window.removeEventListener("scroll", hideTooltip, true);
+      window.removeEventListener("touchcancel", hideTooltip);
+      window.removeEventListener("pointerup", hideTooltip);
+      window.removeEventListener("resize", hideTooltip);
+    };
+  }, []);
+
+  useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 767.98px)");
 
     const syncMobileState = (event) => {
@@ -507,56 +538,56 @@ export default function Home() {
     }
   }, [data, isMobileView]);
 
-  // useEffect(() => {
-  //   if (!data) return;
-  //   const monitor = data.monitor;
+  useEffect(() => {
+    if (!data) return;
+    const monitor = data.monitor;
 
-  //   const updateChart = (chart, datasets) => {
-  //     chart.data.datasets.forEach((d, i) => {
-  //       if (datasets[i]) d.data = datasets[i].data;
-  //     });
-  //     chart.update();
-  //   };
+    const updateChart = (chart, datasets) => {
+      chart.data.datasets.forEach((d, i) => {
+        if (datasets[i]) d.data = datasets[i].data;
+      });
+      chart.update();
+    };
 
-  //   if (isMobileView) {
-  //     if (chartsRef.current.cpuMobile) {
-  //       updateChart(chartsRef.current.cpuMobile, [{ data: monitor.cpu_usage }]);
-  //     }
+    if (isMobileView) {
+      if (chartsRef.current.cpuMobile) {
+        updateChart(chartsRef.current.cpuMobile, [{ data: monitor.cpu_usage }]);
+      }
 
-  //     if (chartsRef.current.ramMobile) {
-  //       updateChart(chartsRef.current.ramMobile, [{ data: monitor.ram_usage }]);
-  //     }
+      if (chartsRef.current.ramMobile) {
+        updateChart(chartsRef.current.ramMobile, [{ data: monitor.ram_usage }]);
+      }
 
-  //     if (chartsRef.current.gpuUsageMobile) {
-  //       updateChart(
-  //         chartsRef.current.gpuUsageMobile,
-  //         monitor.gpu_usage.map((series) => ({ data: series }))
-  //       );
-  //     }
+      if (chartsRef.current.gpuUsageMobile) {
+        updateChart(
+          chartsRef.current.gpuUsageMobile,
+          monitor.gpu_usage.map((series) => ({ data: series }))
+        );
+      }
 
-  //     if (chartsRef.current.gpuMemoryMobile) {
-  //       updateChart(
-  //         chartsRef.current.gpuMemoryMobile,
-  //         monitor.gpu_memory.map((series) => ({ data: series }))
-  //       );
-  //     }
+      if (chartsRef.current.gpuMemoryMobile) {
+        updateChart(
+          chartsRef.current.gpuMemoryMobile,
+          monitor.gpu_memory.map((series) => ({ data: series }))
+        );
+      }
 
-  //     return;
-  //   }
+      return;
+    }
 
-  //   if (chartsRef.current.cpu) updateChart(chartsRef.current.cpu, [{ data: monitor.cpu_usage }]);
-  //   if (chartsRef.current.ram) updateChart(chartsRef.current.ram, [{ data: monitor.ram_usage }]);
-  //   if (chartsRef.current.gpuUsage)
-  //     updateChart(
-  //       chartsRef.current.gpuUsage,
-  //       monitor.gpu_usage.map((d) => ({ data: d }))
-  //     );
-  //   if (chartsRef.current.gpuMemory)
-  //     updateChart(
-  //       chartsRef.current.gpuMemory,
-  //       monitor.gpu_memory.map((d) => ({ data: d }))
-  //     );
-  // }, [data, isMobileView]);
+    if (chartsRef.current.cpu) updateChart(chartsRef.current.cpu, [{ data: monitor.cpu_usage }]);
+    if (chartsRef.current.ram) updateChart(chartsRef.current.ram, [{ data: monitor.ram_usage }]);
+    if (chartsRef.current.gpuUsage)
+      updateChart(
+        chartsRef.current.gpuUsage,
+        monitor.gpu_usage.map((d) => ({ data: d }))
+      );
+    if (chartsRef.current.gpuMemory)
+      updateChart(
+        chartsRef.current.gpuMemory,
+        monitor.gpu_memory.map((d) => ({ data: d }))
+      );
+  }, [data, isMobileView]);
 
   const monitor = data?.monitor;
   const cpuUsage = latestMetricValue(monitor?.cpu_usage, 0);
@@ -620,7 +651,7 @@ export default function Home() {
                 />
                 <MobileMetricBar
                   label="RAM Usage"
-                  valueText={`${ramUsage.toFixed(1)} / ${ramTotal.toFixed(1)} GB`}
+                  valueText={`${ramUsagePercent.toFixed(0)}%`}
                   percent={ramTotal > 0 ? (ramUsage / ramTotal) * 100 : 0}
                   tone="info"
                 />

@@ -4,6 +4,9 @@ import { getTaskSummary } from "../../utils/taskSummary";
 
 export default function TaskStatus({ data }) {
   const summary = getTaskSummary(data);
+  const handleNavigate = () => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  };
   const items = [
     { key: "queued", label: "Queued", count: summary.queued, to: "/create_task" },
     { key: "running", label: "Running", count: summary.running, to: "/ongoing_task" },
@@ -28,7 +31,12 @@ export default function TaskStatus({ data }) {
 
       <div className="dashboard-task-grid">
         {items.map((item) => (
-          <Link key={item.key} to={item.to} className={`dashboard-task-tile dashboard-task-tile-${item.key}`}>
+          <Link
+            key={item.key}
+            to={item.to}
+            onClick={handleNavigate}
+            className={`dashboard-task-tile dashboard-task-tile-${item.key}`}
+          >
             <div className="dashboard-task-tile-value">{item.count}</div>
             <div className="dashboard-task-tile-label">{item.label}</div>
           </Link>
