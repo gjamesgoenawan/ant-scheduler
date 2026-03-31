@@ -18558,6 +18558,102 @@ Icon colors
 
   .dashboard-chart-canvas {
     height: 133px;
+    position: relative;
+  }
+
+  .dashboard-chart-tooltip {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1080;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s ease;
+  }
+
+  .dashboard-chart-tooltip-inner {
+    min-width: 150px;
+    max-width: min(18rem, calc(100vw - 24px));
+    padding: 0.65rem 0.75rem;
+    border-radius: 0.8rem;
+    background: rgba(255, 255, 255, 0.98);
+    color: #0f172a;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+    backdrop-filter: blur(8px);
+  }
+
+  .dashboard-chart-tooltip-title {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 0.45rem;
+  }
+
+  .dashboard-chart-tooltip-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .dashboard-chart-tooltip-row + .dashboard-chart-tooltip-row {
+    margin-top: 0.3rem;
+  }
+
+  .dashboard-chart-tooltip-swatch {
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+  }
+
+  .dashboard-chart-tooltip-label {
+    font-size: 0.78rem;
+    color: #334155;
+    min-width: 0;
+    word-break: break-word;
+  }
+
+  .dashboard-chart-tooltip-value {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #0f172a;
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 767.98px) {
+    .dashboard-chart-tooltip-inner {
+      min-width: 120px;
+      max-width: min(14rem, calc(100vw - 20px));
+      padding: 0.5rem 0.6rem;
+      border-radius: 0.7rem;
+    }
+
+    .dashboard-chart-tooltip-title {
+      font-size: 0.62rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .dashboard-chart-tooltip-row {
+      gap: 0.35rem;
+    }
+
+    .dashboard-chart-tooltip-row + .dashboard-chart-tooltip-row {
+      margin-top: 0.22rem;
+    }
+
+    .dashboard-chart-tooltip-swatch {
+      width: 8px;
+      height: 8px;
+    }
+
+    .dashboard-chart-tooltip-label,
+    .dashboard-chart-tooltip-value {
+      font-size: 0.7rem;
+    }
   }
 
   .dashboard-chart-grid-gpu {
@@ -18951,6 +19047,42 @@ Icon colors
     gap: 0.95rem;
   }
 
+  .dashboard-mobile-chart-row {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+    margin-bottom: 0.95rem;
+  }
+
+  .dashboard-mobile-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+    align-items: end;
+  }
+
+  .dashboard-mobile-chart-shell {
+    height: 110px;
+    border-radius: 0.9rem;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .dashboard-mobile-chart-shell canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  .dashboard-mobile-chart-shell-compute {
+    background: rgba(24, 7, 56, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .dashboard-mobile-chart-shell-gpu {
+    background: #fff;
+    border: 1px solid rgba(226, 232, 240, 0.9);
+  }
+
   .dashboard-mobile-gpu-group {
     padding: 0.9rem;
     border-radius: 0.85rem;
@@ -18967,7 +19099,7 @@ Icon colors
     margin-bottom: 0.85rem;
   }
 
-  .mobile-metric-row + .mobile-metric-row {
+  .dashboard-mobile-metrics:not(.dashboard-mobile-metrics-grid) .mobile-metric-row + .mobile-metric-row {
     margin-top: 0.2rem;
   }
 
@@ -19066,11 +19198,11 @@ Icon colors
   }
 
   .task-detail-output-shell {
-    margin-left: -1.2rem;
-    margin-right: -1.2rem;
+    margin-left: 0;
+    margin-right: 0;
     overflow-x: auto;
     overflow-y: auto;
-    border-radius: 0 !important;
+    border-radius: 0.75rem !important;
   }
 
   .task-detail-output-pre {
@@ -19639,6 +19771,7 @@ Icon colors
       margin-right: 0;
       padding: 0.75rem !important;
       min-height: 220px !important;
+      border-radius: 0 !important;
     }
 
     .task-detail-output-pre {

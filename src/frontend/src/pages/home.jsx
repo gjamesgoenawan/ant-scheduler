@@ -75,14 +75,95 @@ function formatGpuFleetSummary(names) {
     .join(" · ");
 }
 
+function getOrCreateChartTooltip(chart) {
+  const doc = chart.canvas.ownerDocument;
+  let tooltipEl = doc.body.querySelector(".dashboard-chart-tooltip");
+
+  if (!tooltipEl) {
+    tooltipEl = doc.createElement("div");
+    tooltipEl.className = "dashboard-chart-tooltip";
+    tooltipEl.innerHTML = '<div class="dashboard-chart-tooltip-inner"></div>';
+    doc.body.appendChild(tooltipEl);
+  }
+
+  return tooltipEl;
+}
+
+function externalChartTooltipHandler(context) {
+  const { chart, tooltip } = context;
+  const tooltipEl = getOrCreateChartTooltip(chart);
+  const doc = chart.canvas.ownerDocument;
+  const win = doc.defaultView || window;
+  const viewportPadding = 12;
+
+  if (!tooltip || tooltip.opacity === 0) {
+    tooltipEl.style.opacity = "0";
+    return;
+  }
+
+  const title = tooltip.title?.[0] || "";
+  const bodyHtml = (tooltip.dataPoints || [])
+    .map((point) => {
+      const color = point.dataset.borderColor || "#94a3b8";
+      return `
+        <div class="dashboard-chart-tooltip-row">
+          <span class="dashboard-chart-tooltip-swatch" style="background:${color};"></span>
+          <span class="dashboard-chart-tooltip-label">${point.dataset.label}</span>
+          <span class="dashboard-chart-tooltip-value">${point.formattedValue}</span>
+        </div>
+      `;
+    })
+    .join("");
+
+  tooltipEl.querySelector(".dashboard-chart-tooltip-inner").innerHTML = `
+    ${title ? `<div class="dashboard-chart-tooltip-title">${title}</div>` : ""}
+    ${bodyHtml}
+  `;
+
+  const rect = chart.canvas.getBoundingClientRect();
+  const tooltipWidth = tooltipEl.offsetWidth;
+  const tooltipHeight = tooltipEl.offsetHeight;
+  const caretX = rect.left + tooltip.caretX;
+  const caretY = rect.top + tooltip.caretY;
+
+  let left = caretX + 12;
+  let top = caretY - tooltipHeight - 12;
+
+  if (left + tooltipWidth > win.innerWidth - viewportPadding) {
+    left = win.innerWidth - viewportPadding - tooltipWidth;
+  }
+  if (left < viewportPadding) {
+    left = viewportPadding;
+  }
+
+  if (top < viewportPadding) {
+    top = caretY + 12;
+  }
+  if (top + tooltipHeight > win.innerHeight - viewportPadding) {
+    top = win.innerHeight - viewportPadding - tooltipHeight;
+  }
+  if (top < viewportPadding) {
+    top = viewportPadding;
+  }
+
+  tooltipEl.style.opacity = "1";
+  tooltipEl.style.left = `${left}px`;
+  tooltipEl.style.top = `${top}px`;
+}
+
 function buildLineChartOptions({ min = 0, max, title }) {
   return {
-    animation: false,
+    animation: true,
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
         display: false,
+      },
+      tooltip: {
+        enabled: false,
+        position: "nearest",
+        external: externalChartTooltipHandler,
       },
     },
     interaction: {
@@ -91,7 +172,7 @@ function buildLineChartOptions({ min = 0, max, title }) {
     },
     elements: {
       line: {
-        tension: 0.5,
+        tension: 0.0,
       },
     },
     scales: {
@@ -147,6 +228,57 @@ function buildLineChartOptions({ min = 0, max, title }) {
   };
 }
 
+function buildCompactLineChartOptions({ min = 0, max }) {
+  return {
+    animation: true,
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false,
+      },
+      tooltip: {
+        enabled: false,
+        position: "nearest",
+        external: externalChartTooltipHandler,
+      },
+    },
+    interaction: {
+      intersect: false,
+      mode: "index",
+    },
+    elements: {
+      line: {
+        tension: 0.0,
+      },
+      point: {
+        radius: 0,
+        hoverRadius: 2,
+      },
+    },
+    scales: {
+      y: {
+        min,
+        max,
+        display: false,
+        grid: {
+          display: false,
+          drawBorder: false,
+          drawTicks: false,
+        },
+      },
+      x: {
+        display: false,
+        grid: {
+          display: false,
+          drawBorder: false,
+          drawTicks: false,
+        },
+      },
+    },
+  };
+}
+
 function MobileMetricBar({ label, valueText, percent, tone = "primary" }) {
   return (
     <div className="mobile-metric-row">
@@ -172,12 +304,20 @@ export default function Home() {
   const ramRef = useRef(null);
   const gpuUsageRef = useRef(null);
   const gpuMemoryRef = useRef(null);
+  const cpuMobileRef = useRef(null);
+  const ramMobileRef = useRef(null);
+  const gpuUsageMobileRef = useRef(null);
+  const gpuMemoryMobileRef = useRef(null);
 
   const chartsRef = useRef({
     cpu: null,
     ram: null,
     gpuUsage: null,
     gpuMemory: null,
+    cpuMobile: null,
+    ramMobile: null,
+    gpuUsageMobile: null,
+    gpuMemoryMobile: null,
   });
 
   useEffect(() => {
@@ -198,11 +338,116 @@ export default function Home() {
     return () => mediaQuery.removeListener(syncMobileState);
   }, []);
 
-  // Create charts only once
   useEffect(() => {
-    if (!data || isMobileView) return;
+    const keysToDestroy = isMobileView
+      ? ["cpu", "ram", "gpuUsage", "gpuMemory"]
+      : ["cpuMobile", "ramMobile", "gpuUsageMobile", "gpuMemoryMobile"];
+
+    keysToDestroy.forEach((key) => {
+      if (chartsRef.current[key]) {
+        chartsRef.current[key].destroy();
+        chartsRef.current[key] = null;
+      }
+    });
+  }, [isMobileView]);
+
+  useEffect(() => {
+    return () => {
+      Object.keys(chartsRef.current).forEach((key) => {
+        if (chartsRef.current[key]) {
+          chartsRef.current[key].destroy();
+          chartsRef.current[key] = null;
+        }
+      });
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!data) return;
     const monitor = data.monitor;
     const labels = Array.from({ length: monitor.cpu_usage.length }, (_, idx) => `${monitor.cpu_usage.length - idx} seconds ago`);
+
+    if (isMobileView) {
+      if (cpuMobileRef.current && !chartsRef.current.cpuMobile) {
+        chartsRef.current.cpuMobile = new Chart(cpuMobileRef.current.getContext("2d"), {
+          type: "line",
+          data: {
+            labels,
+            datasets: [
+              {
+                label: "CPU Usage",
+                data: monitor.cpu_usage,
+                borderColor: "#ffffff",
+                fill: false,
+                pointRadius: 0,
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: buildCompactLineChartOptions({ max: 100 }),
+        });
+      }
+
+      if (ramMobileRef.current && !chartsRef.current.ramMobile) {
+        chartsRef.current.ramMobile = new Chart(ramMobileRef.current.getContext("2d"), {
+          type: "line",
+          data: {
+            labels,
+            datasets: [
+              {
+                label: "RAM Usage",
+                data: monitor.ram_usage,
+                borderColor: "#e9d5ff",
+                fill: false,
+                pointRadius: 0,
+                borderWidth: 2,
+              },
+            ],
+          },
+          options: buildCompactLineChartOptions({ max: monitor.ram_total }),
+        });
+      }
+
+      if (gpuUsageMobileRef.current && !chartsRef.current.gpuUsageMobile) {
+        chartsRef.current.gpuUsageMobile = new Chart(gpuUsageMobileRef.current.getContext("2d"), {
+          type: "line",
+          data: {
+            labels,
+            datasets: monitor.gpu_usage.map((series, index) => ({
+              label: `GPU ${index}`,
+              data: series,
+              borderColor: GPU_LINE_COLORS[index % GPU_LINE_COLORS.length],
+              fill: false,
+              pointRadius: 0,
+              borderWidth: 2,
+            })),
+          },
+          options: buildCompactLineChartOptions({ max: 100 }),
+        });
+      }
+
+      if (gpuMemoryMobileRef.current && !chartsRef.current.gpuMemoryMobile) {
+        chartsRef.current.gpuMemoryMobile = new Chart(gpuMemoryMobileRef.current.getContext("2d"), {
+          type: "line",
+          data: {
+            labels,
+            datasets: monitor.gpu_memory.map((series, index) => ({
+              label: `GPU ${index}`,
+              data: series,
+              borderColor: GPU_LINE_COLORS[index % GPU_LINE_COLORS.length],
+              fill: false,
+              pointRadius: 0,
+              borderWidth: 2,
+            })),
+          },
+          options: buildCompactLineChartOptions({
+            max: Math.max(...monitor.gpu_total_memory),
+          }),
+        });
+      }
+
+      return;
+    }
 
     if (!chartsRef.current.cpu) {
       chartsRef.current.cpu = new Chart(cpuRef.current.getContext("2d"), {
@@ -262,31 +507,56 @@ export default function Home() {
     }
   }, [data, isMobileView]);
 
-  // Update charts in place when new data comes in
-  useEffect(() => {
-    if (!data || isMobileView) return;
-    const monitor = data.monitor;
+  // useEffect(() => {
+  //   if (!data) return;
+  //   const monitor = data.monitor;
 
-    const updateChart = (chart, datasets) => {
-      chart.data.datasets.forEach((d, i) => {
-        if (datasets[i]) d.data = datasets[i].data;
-      });
-      chart.update();
-    };
+  //   const updateChart = (chart, datasets) => {
+  //     chart.data.datasets.forEach((d, i) => {
+  //       if (datasets[i]) d.data = datasets[i].data;
+  //     });
+  //     chart.update();
+  //   };
 
-    if (chartsRef.current.cpu) updateChart(chartsRef.current.cpu, [{ data: monitor.cpu_usage }]);
-    if (chartsRef.current.ram) updateChart(chartsRef.current.ram, [{ data: monitor.ram_usage }]);
-    if (chartsRef.current.gpuUsage)
-      updateChart(
-        chartsRef.current.gpuUsage,
-        monitor.gpu_usage.map((d) => ({ data: d }))
-      );
-    if (chartsRef.current.gpuMemory)
-      updateChart(
-        chartsRef.current.gpuMemory,
-        monitor.gpu_memory.map((d) => ({ data: d }))
-      );
-  }, [data, isMobileView]);
+  //   if (isMobileView) {
+  //     if (chartsRef.current.cpuMobile) {
+  //       updateChart(chartsRef.current.cpuMobile, [{ data: monitor.cpu_usage }]);
+  //     }
+
+  //     if (chartsRef.current.ramMobile) {
+  //       updateChart(chartsRef.current.ramMobile, [{ data: monitor.ram_usage }]);
+  //     }
+
+  //     if (chartsRef.current.gpuUsageMobile) {
+  //       updateChart(
+  //         chartsRef.current.gpuUsageMobile,
+  //         monitor.gpu_usage.map((series) => ({ data: series }))
+  //       );
+  //     }
+
+  //     if (chartsRef.current.gpuMemoryMobile) {
+  //       updateChart(
+  //         chartsRef.current.gpuMemoryMobile,
+  //         monitor.gpu_memory.map((series) => ({ data: series }))
+  //       );
+  //     }
+
+  //     return;
+  //   }
+
+  //   if (chartsRef.current.cpu) updateChart(chartsRef.current.cpu, [{ data: monitor.cpu_usage }]);
+  //   if (chartsRef.current.ram) updateChart(chartsRef.current.ram, [{ data: monitor.ram_usage }]);
+  //   if (chartsRef.current.gpuUsage)
+  //     updateChart(
+  //       chartsRef.current.gpuUsage,
+  //       monitor.gpu_usage.map((d) => ({ data: d }))
+  //     );
+  //   if (chartsRef.current.gpuMemory)
+  //     updateChart(
+  //       chartsRef.current.gpuMemory,
+  //       monitor.gpu_memory.map((d) => ({ data: d }))
+  //     );
+  // }, [data, isMobileView]);
 
   const monitor = data?.monitor;
   const cpuUsage = latestMetricValue(monitor?.cpu_usage, 0);
@@ -333,7 +603,15 @@ export default function Home() {
                   {monitor ? `${monitor.cpu_count} Cores - ${monitor.cpu_name}` : "Connecting to backend..."}
                 </div>
               </div>
-              <div className="dashboard-mobile-metrics">
+              <div className="dashboard-mobile-chart-row">
+                <div className="dashboard-mobile-chart-shell dashboard-mobile-chart-shell-compute">
+                  <canvas ref={cpuMobileRef} />
+                </div>
+                <div className="dashboard-mobile-chart-shell dashboard-mobile-chart-shell-compute">
+                  <canvas ref={ramMobileRef} />
+                </div>
+              </div>
+              <div className="dashboard-mobile-metrics dashboard-mobile-metrics-grid">
                 <MobileMetricBar
                   label="CPU Usage"
                   valueText={`${cpuUsage.toFixed(1)}%`}
@@ -369,6 +647,9 @@ export default function Home() {
               </div>
               <div className="dashboard-mobile-gpu-groups">
                 <div className="dashboard-mobile-gpu-group">
+                  <div className="dashboard-mobile-chart-shell dashboard-mobile-chart-shell-gpu">
+                    <canvas ref={gpuUsageMobileRef} />
+                  </div>
                   <div className="dashboard-mobile-gpu-group-title">Utilization</div>
                   <div className="dashboard-mobile-gpu-list">
                     {gpuCards.map((gpu) => (
@@ -385,6 +666,9 @@ export default function Home() {
 
                 <div className="dashboard-mobile-gpu-group">
                   <div className="dashboard-mobile-gpu-group-title">Memory</div>
+                  <div className="dashboard-mobile-chart-shell dashboard-mobile-chart-shell-gpu">
+                    <canvas ref={gpuMemoryMobileRef} />
+                  </div>
                   <div className="dashboard-mobile-gpu-list">
                     {gpuCards.map((gpu) => (
                       <MobileMetricBar
