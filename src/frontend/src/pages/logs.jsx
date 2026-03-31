@@ -10,6 +10,7 @@ import {
   terminateTask,
   restartTask,
 } from "../utils/taskActions";
+import TaskDetail from "../components/visualization/task_detail";
 
 
 function Logs() {
@@ -107,128 +108,64 @@ function Logs() {
     <Layout pageTitle="Task Log">
       <div className="container-fluid py-2 logs-page">
         <div className="row mb-2">
-          <div className="log-task-card">
-            
-            <div className="log-task-panel-header">
-              <div className="ongoing-task-panel-top log-task-header-row">
-                <div className="ongoing-task-header-copy log-task-header-copy">
-                  <div className="dashboard-panel-eyebrow">Task ID</div>
-                  <h6 className="dashboard-ops-title ongoing-task-title mb-0 log-task-title">{taskId}</h6>
-                </div>
+          <TaskDetail
+            taskId={taskId}
+            taskInfo={taskInfo}
+            statusContent={getStatusBadge()}
+            renderHeaderActions={() => (
+              <>
+                <button
+                  className="btn btn-link text-dark p-2 mb-0"
+                  title="Copy Command"
+                  onClick={() => copyCommand(taskInfo, addToast)}
+                >
+                  <i className="material-icons text-lg">copy</i>
+                </button>
 
-                <div className="ongoing-task-header-controls log-task-actions">
-                  <button
-                    className="btn btn-link text-dark p-2 mb-0"
-                    title="Copy Command"
-                    onClick={() => copyCommand(taskInfo, addToast)}
-                  >
-                    <i className="material-icons text-lg">copy</i>
-                  </button>
+                <button
+                  className="btn btn-link text-dark p-2 mb-0"
+                  title="Restart Task"
+                  onClick={() => restartTask(taskId, addToast)}
+                  disabled={statusState === "running"}
+                >
+                  <i className="material-icons text-lg">restart_alt</i>
+                </button>
 
-                  <button
-                    className="btn btn-link text-dark p-2 mb-0"
-                    title="Restart Task"
-                    onClick={() => restartTask(taskId, addToast)}
-                    disabled={statusState === "running"}
-                  >
-                    <i className="material-icons text-lg">restart_alt</i>
-                  </button>
+                <button
+                  className="btn btn-link text-dark p-2 mb-0"
+                  title="Download Log"
+                  onClick={() => downloadLog(taskId, addToast)}
+                >
+                  <i className="material-icons text-lg">save_alt</i>
+                </button>
 
-                  <button
-                    className="btn btn-link text-dark p-2 mb-0"
-                    title="Download Log"
-                    onClick={() => downloadLog(taskId, addToast)}
-                  >
-                    <i className="material-icons text-lg">save_alt</i>
-                  </button>
-
-                  <button
-                    className="btn btn-link text-danger p-2 mb-0"
-                    title={statusState === "running" ? "Kill Task" : "Delete Task"}
-                    onClick={() =>
-                      statusState === "running"
-                        ? terminateTask(taskId, addToast)
-                        : deleteTask(taskId, addToast)
-                    }
-                  >
-                    <i className="material-icons text-lg">
-                      {statusState === "running" ? "cancel" : "delete_outline"}
-                    </i>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {statusState === "loading" ? (
-                <div className="log-task-panel-body">
-                    <div className="alert alert-light text-center mb-4">Loading task details...</div>
-                </div>
-            ) : taskNotFound ? (
-                <div className="log-task-panel-body">
-                    <div className="alert alert-light text-center mb-0">
-                        Task ID <b>{taskId}</b> not found.
-                    </div>
-                </div>
-            ) : (
-                <div className="log-task-panel-body">
-              
-                    <div className="bg-gray-100 rounded p-3 mb-4 log-task-summary" style={{ backgroundColor: "#f8f9fa" }}>
-                      <div className="row">
-                        
-                        <div className="col-md-3 col-6 mb-3">
-                          <span className="text-xs font-weight-bold text-secondary text-uppercase">Status</span>
-                          <div className="mt-1">{getStatusBadge()}</div>
-                        </div>
-                        <> 
-                          <div className="col-md-3 col-6 mb-3">
-                            <span className="text-xs font-weight-bold text-secondary text-uppercase">Start Time</span>
-                            <p className="text-sm text-dark font-weight-bold mb-0">
-                              {taskInfo?.time?.start || "-"}
-                            </p>
-                          </div>
-
-                          <div className="col-md-3 col-6 mb-3">
-                            <span className="text-xs font-weight-bold text-secondary text-uppercase">Duration</span>
-                            <p className="text-sm text-dark font-weight-bold mb-0">
-                              {taskInfo?.time?.runtime || "-"}
-                            </p>
-                          </div>
-
-                          <div className="col-md-3 col-6 mb-3">
-                            <span className="text-xs font-weight-bold text-secondary text-uppercase">GPU IDs</span>
-                            <p className="text-sm text-dark font-weight-bold mb-0">
-                              {taskInfo?.gpu_ids && taskInfo.gpu_ids.length > 0 
-                                ? taskInfo.gpu_ids.join(", ") 
-                                : "No GPU Assigned"}
-                            </p>
-                          </div>
-
-                        </>
-                      </div>
-
-                      <div className="log-task-command-row mt-1">
-                        <div className="text-xs font-weight-bold text-secondary text-uppercase mb-2">Command</div>
-                        <div className="log-task-command">
-                          <code className="text-dark log-task-command-text" style={{ wordBreak: "break-all" }}>
-                            {taskInfo?.command || "-"}
-                          </code>
-                        </div>
-                      </div>
-                    </div>
-                  
-                    <h6 className="text-uppercase text-secondary text-xxs font-weight-bolder opacity-7 mb-2">
-                      Log Output
-                    </h6>
-                    <div 
-                      className="bg-black text-light p-3 rounded log-output-shell" 
-                      style={{ minHeight: "300px" }}
-                    >
-                      <pre className="log-output-pre" style={{ margin: 0, whiteSpace: "pre" }}>{logs || "Failed to load Log."}</pre>
-                    </div>
-
-                </div>
+                <button
+                  className="btn btn-link text-danger p-2 mb-0"
+                  title={statusState === "running" ? "Kill Task" : "Delete Task"}
+                  onClick={() =>
+                    statusState === "running"
+                      ? terminateTask(taskId, addToast)
+                      : deleteTask(taskId, addToast)
+                  }
+                >
+                  <i className="material-icons text-lg">
+                    {statusState === "running" ? "cancel" : "delete_outline"}
+                  </i>
+                </button>
+              </>
             )}
-          </div>
+            outputLabel="Log Output"
+            outputType="log"
+            outputContent={logs}
+            outputMinHeight="300px"
+            loading={statusState === "loading"}
+            notFound={taskNotFound}
+            notFoundMessage={
+              <>
+                Task ID <b>{taskId}</b> not found.
+              </>
+            }
+          />
         </div>
       </div>
     </Layout>

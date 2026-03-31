@@ -64,23 +64,6 @@ def read_last_n_lines(filename, n=1):
         last_n_lines = buffer.decode(errors='ignore').splitlines()
     return last_n_lines
 
-def wrap_text(content, max_width, max_height, text_wrap):
-    if text_wrap.lower() == 'wrap':
-        wrapped_lines = []
-        for line in content:
-            while len(line) > (max_width - 4):
-                wrapped_lines.append(line[:max_width])
-                line = line[max_width - 4:]
-            wrapped_lines.append(line)
-
-        wrapped_lines = wrapped_lines[-(max_height + 1):]
-    
-    elif text_wrap.lower() == 'no-wrap':
-        wrapped_lines = [i.strip() for i in content[-(max_height + 1):]]
-    else:
-        wrapped_lines = ""
-    return wrapped_lines
-
 def format_timedelta(td):
     if isinstance(td, int) or isinstance(td, float):
         td = datetime.timedelta(seconds=round(td))

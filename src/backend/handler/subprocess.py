@@ -5,7 +5,7 @@ from typing import Optional
 import psutil
 from handler import base_handler
 from logger import base_logger
-from utils.misc import INF, list2str, read_last_n_lines, wrap_text
+from utils.misc import INF, list2str, read_last_n_lines
 from utils.structures import AntTask
 
 
@@ -164,8 +164,6 @@ Handler      : subprocess_handler
     def vis(self) -> dict:
         # Main interface for visual representation
         win_height = self.opt.get('VISUALIZER_terminal_win_height', 20)
-        win_width = self.opt.get('VISUALIZER_terminal_win_width', INF)
-        text_wrap = self.opt.get('VISUALIZER_terminal_text_wrap', 'no-wrap')
         
         formatted_window_data = {}
 
@@ -173,7 +171,7 @@ Handler      : subprocess_handler
             log_file_name = process_dict['task'].log_file_name
             if os.path.exists(log_file_name):
                 content = [i.replace("\n", "") for i in read_last_n_lines(log_file_name, win_height)]  # Get last few lines
-                formatted_window_data[task_id] = wrap_text(content, win_width, win_height, text_wrap)
+                formatted_window_data[task_id] = content
             else:
                 formatted_window_data[task_id] = ''
         return {'terminal_logs' : formatted_window_data}

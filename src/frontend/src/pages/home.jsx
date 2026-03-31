@@ -406,36 +406,38 @@ export default function Home() {
           </div>
         ) : (
         <>
-        <div className="dashboard-overview-grid mb-3">
-          <div className="dashboard-overview-card dashboard-overview-card-compute">
-            <div className="dashboard-overview-copy">
-              <div className="dashboard-overview-label">CPU</div>
-              <div className="dashboard-overview-value">{cpuUsage.toFixed(1)}%</div>
-              <div className="dashboard-overview-meta">{monitor?.cpu_count || 0} cores online</div>
+        <div className="row mb-3">
+          <div className="dashboard-overview-grid">
+            <div className="dashboard-overview-card dashboard-overview-card-compute">
+              <div className="dashboard-overview-copy">
+                <div className="dashboard-overview-label">CPU</div>
+                <div className="dashboard-overview-value">{cpuUsage.toFixed(1)}%</div>
+                <div className="dashboard-overview-meta">{monitor?.cpu_count || 0} cores online</div>
+              </div>
             </div>
-          </div>
 
-          <div className="dashboard-overview-card dashboard-overview-card-memory">
-            <div className="dashboard-overview-copy">
-              <div className="dashboard-overview-label">RAM</div>
-              <div className="dashboard-overview-value">{ramUsage.toFixed(1)} / {ramTotal.toFixed(1)} GB</div>
-              <div className="dashboard-overview-meta">{ramUsagePercent.toFixed(0)}% in use</div>
+            <div className="dashboard-overview-card dashboard-overview-card-memory">
+              <div className="dashboard-overview-copy">
+                <div className="dashboard-overview-label">RAM</div>
+                <div className="dashboard-overview-value">{ramUsage.toFixed(1)} / {ramTotal.toFixed(1)} GB</div>
+                <div className="dashboard-overview-meta">{ramUsagePercent.toFixed(0)}% in use</div>
+              </div>
             </div>
-          </div>
 
-          <div className="dashboard-overview-card dashboard-overview-card-workers">
-            <div className="dashboard-overview-copy">
-              <div className="dashboard-overview-label">Workers</div>
-              <div className="dashboard-overview-value">{gpuReadyCount} ready</div>
-              <div className="dashboard-overview-meta">{gpuEnabledCount} enabled · {totalVram} GB VRAM</div>
+            <div className="dashboard-overview-card dashboard-overview-card-workers">
+              <div className="dashboard-overview-copy">
+                <div className="dashboard-overview-label">Workers</div>
+                <div className="dashboard-overview-value">{gpuReadyCount} ready</div>
+                <div className="dashboard-overview-meta">{gpuEnabledCount} enabled · {totalVram} GB VRAM</div>
+              </div>
             </div>
-          </div>
 
-          <div className="dashboard-overview-card dashboard-overview-card-tasks">
-            <div className="dashboard-overview-copy">
-              <div className="dashboard-overview-label">Tasks</div>
-              <div className="dashboard-overview-value">{runningCount} running</div>
-              <div className="dashboard-overview-meta">{queuedCount} queued · {completedCount} completed</div>
+            <div className="dashboard-overview-card dashboard-overview-card-tasks">
+              <div className="dashboard-overview-copy">
+                <div className="dashboard-overview-label">Tasks</div>
+                <div className="dashboard-overview-value">{runningCount} running</div>
+                <div className="dashboard-overview-meta">{queuedCount} queued · {completedCount} completed</div>
+              </div>
             </div>
           </div>
         </div>
