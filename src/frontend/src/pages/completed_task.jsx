@@ -399,7 +399,7 @@ export default function CompletedTasks() {
               {filteredTasks.length === 0 ? (
                   <div className="text-center py-4 text-muted">No completed tasks found.</div>
               ) : (
-                  filteredTasks.map((task, idx) => (
+                  filteredTasks.toReversed().map((task, idx) => (
                   <TaskRow 
                       key={task.task_id} 
                       task={task} 
