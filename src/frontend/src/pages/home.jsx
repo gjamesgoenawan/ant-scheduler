@@ -168,7 +168,7 @@ function externalChartTooltipHandler(context) {
 
 function buildLineChartOptions({ min = 0, max, title }) {
   return {
-    animation: true,
+    animation: false,
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -245,7 +245,7 @@ function buildLineChartOptions({ min = 0, max, title }) {
 
 function buildCompactLineChartOptions({ min = 0, max }) {
   return {
-    animation: true,
+    animation: false,
     responsive: true,
     maintainAspectRatio: false,
     plugins: {

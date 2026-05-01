@@ -37,6 +37,7 @@ def read_last_n_lines(filename, n=1):
         f.seek(0, os.SEEK_END)
         position = f.tell()
         buffer = bytearray()
+        prev_byte = None
 
         # offset
         n += 1
@@ -46,11 +47,12 @@ def read_last_n_lines(filename, n=1):
                 f.seek(position - 1)
                 byte = f.read(1)
                 position -= 1
-                if byte == b'\n':
+                if byte == b'\n' or (byte == b'\r' and prev_byte != b'\n'):
                     n -= 1
                     if n == 0:
                         break
                 buffer.extend(byte)
+                prev_byte = byte
             except OSError:
                 f.seek(0)
                 break
