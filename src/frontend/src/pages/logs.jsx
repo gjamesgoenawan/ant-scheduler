@@ -68,12 +68,13 @@ function Logs() {
   // get the log
   useEffect(() => {
     if (taskId && !taskNotFound) { 
-      fetch(`${API_URL}/get_log?task_id=${taskId}`)
-        .then((res) => {
+      fetch(`${API_URL}/get_log?task_id=${encodeURIComponent(taskId)}`)
+        .then(async (res) => {
+          const payload = await res.json().catch(() => null);
           if (!res.ok) {
-             throw new Error("Network response was not ok");
+             throw new Error(payload?.message || payload?.data || "Failed to load logs.");
           }
-          return res.json();
+          return payload;
         })
         .then((data) => {
           if (data.status === "success") {
@@ -84,7 +85,7 @@ function Logs() {
         })
         .catch((err) => {
           console.error(err);
-          setLogs("Error connecting to log service.");
+          setLogs(String(err.message || err || "Failed to load logs."));
         });
     }
   }, [taskId, taskNotFound]);

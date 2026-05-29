@@ -136,7 +136,7 @@ def get_log():
     if success:
         return jsonify({"status": "success", "data": logs}), 200
     else:
-        return jsonify({"status": "error", "data": "Log file not found"}), 400
+        return jsonify({"status": "error", "message": logs or "Log file not found", "data": logs}), 404
 
 @app.route("/get_log_file", methods=["GET"])
 def get_log_file():

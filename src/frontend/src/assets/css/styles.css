@@ -18219,12 +18219,134 @@ Icon colors
     min-height: auto !important;
   }
 
+  .navbar-page-bar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .navbar-page-title {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .navbar-page-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-left: auto;
+    padding-top: 1rem;
+    flex: 0 1 auto;
+  }
+
+  .navbar-page-action-group {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .page-action-btn {
+    min-height: 32px;
+    padding: 0.34rem 0.65rem !important;
+    border-radius: 0.65rem !important;
+    box-shadow: none !important;
+    transform: none !important;
+  }
+
+  .task-detail-card.dashboard-ops-panel {
+    padding: 1rem;
+  }
+
+  .ongoing-task-page .row.mb-3 {
+    margin-bottom: 0.85rem !important;
+  }
+
+  .task-detail-summary {
+    padding: 0.85rem !important;
+  }
+
+  .task-detail-summary.mb-4 {
+    margin-bottom: 0.85rem !important;
+  }
+
+  .task-detail-summary .col-md-3,
+  .task-detail-summary .col-6 {
+    margin-bottom: 0.55rem !important;
+  }
+
+  .task-detail-summary .mt-1 {
+    margin-top: 0.15rem !important;
+  }
+
+  .task-detail-command-row {
+    margin-top: 0.35rem !important;
+  }
+
+  .task-detail-command-row .mb-2 {
+    margin-bottom: 0.35rem !important;
+  }
+
+  .task-detail-command {
+    padding: 0.75rem;
+  }
+
+  .task-detail-output-shell {
+    padding: 0.85rem !important;
+  }
+
   .completed-task-row-top {
     display: flex;
     align-items: center !important;
     justify-content: space-between;
     gap: 0.75rem;
     padding-right: 0.7rem;
+  }
+
+  .completed-task-row {
+    padding-top: 0.65rem !important;
+    padding-bottom: 0.65rem !important;
+  }
+
+  .completed-task-expanded-panel {
+    margin-top: 0.6rem !important;
+    padding: 0.75rem !important;
+  }
+
+  .completed-task-expanded-panel .row {
+    row-gap: 0.2rem;
+  }
+
+  .completed-task-command-shell {
+    padding: 0.65rem !important;
+  }
+
+  .completed-task-output-header {
+    min-height: 28px;
+    margin-bottom: 0.35rem !important;
+  }
+
+  .completed-task-output-shell {
+    min-height: 160px;
+    max-height: 250px;
+    overflow-x: auto;
+    overflow-y: auto;
+    border-radius: 0.7rem !important;
+  }
+
+  .completed-task-output-pre {
+    display: block;
+    min-width: max-content;
+    margin: 0;
+    white-space: pre;
+    color: inherit;
+    font-family: var(--bs-font-monospace);
+    font-size: 13px;
+    line-height: 1.42;
+    font-weight: 400;
   }
 
   .completed-task-meta {
@@ -18316,6 +18438,46 @@ Icon colors
     margin-right: 0rem;
     justify-content: flex-start !important;
     gap: 0.75rem;
+  }
+
+  .env-var-add-menu {
+    position: relative;
+  }
+
+  .env-var-preset-menu {
+    left: 50%;
+    min-width: 280px;
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 0.35rem;
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    border-radius: 0.75rem;
+    box-shadow: 0 16px 34px rgba(15, 23, 42, 0.14);
+    transform: translateX(-50%);
+  }
+
+  .env-var-preset-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 0.65rem;
+    border-radius: 0.5rem;
+  }
+
+  .env-var-preset-key {
+    min-width: 0;
+    font-family: var(--bs-font-monospace);
+    font-size: 0.78rem;
+    color: #344767;
+    overflow-wrap: anywhere;
+  }
+
+  .env-var-preset-default {
+    flex: 0 0 auto;
+    font-family: var(--bs-font-monospace);
+    font-size: 0.72rem;
+    color: #94a3b8;
   }
 
   .completed-task-toolbar-status {
@@ -19482,7 +19644,27 @@ Icon colors
       padding-left: 0.8rem !important;
       padding-right: 0.8rem !important;
       min-height: 48px;
-      align-items: center;
+      align-items: flex-start;
+    }
+
+    .navbar-page-bar {
+      gap: 0.6rem;
+    }
+
+    .navbar-page-actions {
+      padding-top: 0;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+      max-width: 72%;
+    }
+
+    .navbar-page-action-group {
+      gap: 0.35rem;
+    }
+
+    .page-action-btn {
+      min-height: 30px;
+      padding: 0.3rem 0.5rem !important;
     }
 
     .main-content .navbar-main h4 {

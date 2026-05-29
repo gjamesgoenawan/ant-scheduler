@@ -24,7 +24,7 @@
     "MONITORING_smoother_alpha": 0.1,
 
     "HANDLER_pipe_to_file": true,
-     
+
     "VISUALIZER_log_max_height": 20,
     "VISUALIZER_log_max_width": "inf",
     "VISUALIZER_terminal_win_height": 20,

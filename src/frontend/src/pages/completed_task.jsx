@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Layout, { useToast } from "../components/layout/layout";
-import { useMonitorData } from "../App";
+import { API_URL, useMonitorData } from "../App";
 import {
   bulkDeleteTasks,
   bulkDownloadLogs,
@@ -10,20 +10,75 @@ import {
   deleteTask,
   restartTask,
 } from "../utils/taskActions";
+import {
+  getStoredBoolean,
+  readBooleanMap,
+  writeBooleanMap,
+} from "../utils/persistedTaskState";
 
+const COMPLETED_DETAIL_STORAGE_KEY = "antScheduler.completedTasks.detailExpanded";
+const COMPLETED_OUTPUT_STORAGE_KEY = "antScheduler.completedTasks.outputExpanded";
+
+async function fetchTaskLog(taskId) {
+  const res = await fetch(`${API_URL}/get_log?task_id=${encodeURIComponent(taskId)}`);
+  const payload = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    throw new Error(payload?.message || payload?.data || "Failed to load logs.");
+  }
+
+  if (payload?.status === "success") {
+    return payload.data || "";
+  }
+
+  throw new Error(payload?.message || payload?.data || "Failed to load logs.");
+}
 
 const TaskRow = ({
   task,
   isLast,
   isSelectMode,
   isSelected,
+  isExpanded,
+  isOutputExpanded,
   onToggleSelect,
+  onToggleExpanded,
+  onToggleOutput,
   onCopy,
   onRestart,
   onDelete,
   onDownload,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [outputContent, setOutputContent] = useState("");
+  const [outputLoading, setOutputLoading] = useState(false);
+  const [outputError, setOutputError] = useState(null);
+
+  useEffect(() => {
+    if (!isExpanded || !isOutputExpanded) return;
+
+    let cancelled = false;
+    setOutputLoading(true);
+    setOutputError(null);
+
+    fetchTaskLog(task.task_id)
+      .then((content) => {
+        if (cancelled) return;
+        setOutputContent(content);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setOutputError(String(error.message || error));
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setOutputLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [task.task_id, isExpanded, isOutputExpanded]);
+
   const statusSquare = (
     <div
       className={`rounded-1 ${task.terminated ? "bg-danger" : "bg-success"}`}
@@ -99,7 +154,7 @@ const TaskRow = ({
               className="completed-task-details-btn-mobile btn btn-link text-dark p-1 mb-0 d-flex align-items-center ongoing-task-mobile-toggle"
               onClick={(e) => {
                 e.stopPropagation();
-                setIsExpanded(!isExpanded);
+                onToggleExpanded(task.task_id);
               }}
             >
               <span className="text-xxs text-uppercase font-weight-bolder">
@@ -165,7 +220,7 @@ const TaskRow = ({
             className="completed-task-details-btn completed-task-details-btn-desktop btn btn-link text-dark p-1 mb-0 d-flex align-items-center ongoing-task-mobile-toggle"
             onClick={(e) => {
               e.stopPropagation();
-              setIsExpanded(!isExpanded);
+              onToggleExpanded(task.task_id);
             }}
           >
              <span className="text-xxs text-uppercase font-weight-bolder">
@@ -179,36 +234,68 @@ const TaskRow = ({
       </div>
 
       {isExpanded ? (
-        <div className="mt-3 bg-gray-100 rounded p-3" style={{ backgroundColor: "#f8f9fa" }}>
+        <div className="completed-task-expanded-panel mt-2 bg-gray-100 rounded p-2" style={{ backgroundColor: "#f8f9fa" }}>
           <div className="row">
-             <div className="col-md-3 col-6 mb-3">
-                <span className="text-xs font-weight-bold text-secondary text-uppercase">Status</span>
-                 {detailedBadge}
-             </div>
+            <div className="col-md-3 col-6 mb-2">
+              <span className="text-xs font-weight-bold text-secondary text-uppercase">Status</span>
+              {detailedBadge}
+            </div>
 
-             <div className="col-md-3 col-6 mb-3">
-                <span className="text-xs font-weight-bold text-secondary text-uppercase">Start Time</span>
-                <p className="text-sm text-dark font-weight-bold mb-0">{task.time.start}</p>
-             </div>
+            <div className="col-md-3 col-6 mb-2">
+              <span className="text-xs font-weight-bold text-secondary text-uppercase">Start Time</span>
+              <p className="text-sm text-dark font-weight-bold mb-0">{task.time.start}</p>
+            </div>
              
-             <div className="col-md-3 col-6 mb-3">
-                <span className="text-xs font-weight-bold text-secondary text-uppercase">Duration</span>
-                <p className="text-sm text-dark font-weight-bold mb-0">{task.time.runtime}</p>
-             </div>
+            <div className="col-md-3 col-6 mb-2">
+              <span className="text-xs font-weight-bold text-secondary text-uppercase">Duration</span>
+              <p className="text-sm text-dark font-weight-bold mb-0">{task.time.runtime}</p>
+            </div>
              
-             <div className="col-md-3 col-6 mb-0">
-                <span className="text-xs font-weight-bold text-secondary text-uppercase">GPU IDs</span>
-                <p className="text-sm text-dark font-weight-bold mb-0">
-                    {task.gpu_ids.join(", ") || "No GPU Assigned"}
-                </p>
-             </div>
+            <div className="col-md-3 col-6 mb-0">
+              <span className="text-xs font-weight-bold text-secondary text-uppercase">GPU IDs</span>
+              <p className="text-sm text-dark font-weight-bold mb-0">
+                {task.gpu_ids.join(", ") || "No GPU Assigned"}
+              </p>
+            </div>
              
-             <div className="col-12 mt-1">
-                <span className="text-xs font-weight-bold text-secondary text-uppercase">Command</span>
-                <div className="p-2 border rounded bg-white mt-1">
-                    <code className="text-dark" style={{ wordBreak: "break-all" }}>{task.command}</code>
+            <div className="col-12 mt-1 completed-task-command-row">
+              <span className="text-xs font-weight-bold text-secondary text-uppercase">Command</span>
+              <div className="p-2 border rounded bg-white mt-1 completed-task-command-shell">
+                <code className="text-dark" style={{ wordBreak: "break-all" }}>{task.command}</code>
+              </div>
+            </div>
+
+            <div className="col-12 mt-2 completed-task-output-row">
+              <div className="completed-task-output-header d-flex align-items-center justify-content-between gap-2 mb-2">
+                <span className="text-xs font-weight-bold text-secondary text-uppercase">Output</span>
+                <button
+                  type="button"
+                  className="btn btn-link text-dark p-1 mb-0 d-flex align-items-center gap-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleOutput(task.task_id);
+                  }}
+                  title={isOutputExpanded ? "Hide Output" : "Show Output"}
+                >
+                  <span className="text-xxs text-uppercase font-weight-bolder">
+                    {isOutputExpanded ? "Hide Output" : "Show Output"}
+                  </span>
+                  <i className="material-icons text-sm">
+                    {isOutputExpanded ? "expand_less" : "expand_more"}
+                  </i>
+                </button>
+              </div>
+
+              {isOutputExpanded ? (
+                <div className="bg-black text-light p-3 rounded completed-task-output-shell">
+                  <pre className="completed-task-output-pre">
+                    {outputLoading && !outputContent
+                      ? "Loading output..."
+                      : outputError || outputContent || "Failed to load Log."}
+                  </pre>
                 </div>
-             </div>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}
@@ -223,6 +310,12 @@ export default function CompletedTasks() {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [detailExpandedByTaskId, setDetailExpandedByTaskId] = useState(() =>
+    readBooleanMap(COMPLETED_DETAIL_STORAGE_KEY)
+  );
+  const [outputExpandedByTaskId, setOutputExpandedByTaskId] = useState(() =>
+    readBooleanMap(COMPLETED_OUTPUT_STORAGE_KEY)
+  );
 
   useEffect(() => {
     if (data?.task_completed) {
@@ -252,6 +345,50 @@ export default function CompletedTasks() {
     setIsSelectMode(false);
   };
 
+  const isTaskExpanded = (task) =>
+    getStoredBoolean(detailExpandedByTaskId, task.task_id, false);
+
+  const isTaskOutputExpanded = (task) =>
+    getStoredBoolean(outputExpandedByTaskId, task.task_id, true);
+
+  const updateTaskExpanded = (taskId, expanded) => {
+    setDetailExpandedByTaskId((current) => {
+      const next = { ...current, [taskId]: expanded };
+      writeBooleanMap(COMPLETED_DETAIL_STORAGE_KEY, next);
+      return next;
+    });
+  };
+
+  const updateTaskOutputExpanded = (taskId, expanded) => {
+    setOutputExpandedByTaskId((current) => {
+      const next = { ...current, [taskId]: expanded };
+      writeBooleanMap(COMPLETED_OUTPUT_STORAGE_KEY, next);
+      return next;
+    });
+  };
+
+  const setAllDetailsExpanded = (expanded) => {
+    setDetailExpandedByTaskId((current) => {
+      const next = { ...current };
+      completedTasks.forEach((task) => {
+        next[task.task_id] = expanded;
+      });
+      writeBooleanMap(COMPLETED_DETAIL_STORAGE_KEY, next);
+      return next;
+    });
+  };
+
+  const setAllOutputsExpanded = (expanded) => {
+    setOutputExpandedByTaskId((current) => {
+      const next = { ...current };
+      completedTasks.forEach((task) => {
+        next[task.task_id] = expanded;
+      });
+      writeBooleanMap(COMPLETED_OUTPUT_STORAGE_KEY, next);
+      return next;
+    });
+  };
+
   const handleBulkRestart = async () => {
     await bulkRestartTasks(selectedTaskIds, addToast);
   };
@@ -268,9 +405,46 @@ export default function CompletedTasks() {
   const filteredTasks = completedTasks.filter((task) =>
     task.task_id.toLowerCase().includes(normalizedSearchQuery)
   );
+  const allDetailsExpanded =
+    completedTasks.length > 0 && completedTasks.every((task) => isTaskExpanded(task));
+  const allOutputsExpanded =
+    completedTasks.length > 0 && completedTasks.every((task) => isTaskOutputExpanded(task));
+
+  const pageActions = (
+    <>
+      <button
+        type="button"
+        className="btn btn-outline-dark page-action-btn mb-0 d-flex align-items-center gap-1"
+        disabled={completedTasks.length === 0}
+        onClick={() => setAllOutputsExpanded(!allOutputsExpanded)}
+        title={allOutputsExpanded ? "Collapse All Output" : "Expand All Output"}
+      >
+        <i className="material-icons" style={{ fontSize: "16px" }}>
+          {allOutputsExpanded ? "terminal" : "terminal"}
+        </i>
+        <span className="text-xxs text-uppercase font-weight-bolder">
+          {allOutputsExpanded ? "Hide Output" : "Show Output"}
+        </span>
+      </button>
+      <button
+        type="button"
+        className="btn btn-outline-dark page-action-btn mb-0 d-flex align-items-center gap-1"
+        disabled={completedTasks.length === 0}
+        onClick={() => setAllDetailsExpanded(!allDetailsExpanded)}
+        title={allDetailsExpanded ? "Collapse All Details" : "Expand All Details"}
+      >
+        <i className="material-icons" style={{ fontSize: "16px" }}>
+          {allDetailsExpanded ? "unfold_less" : "unfold_more"}
+        </i>
+        <span className="text-xxs text-uppercase font-weight-bolder">
+          {allDetailsExpanded ? "Hide Details" : "Show Details"}
+        </span>
+      </button>
+    </>
+  );
 
   return (
-    <Layout pageTitle="Completed Tasks">
+    <Layout pageTitle="Completed Tasks" pageActions={pageActions}>
       <div className="container-fluid py-2 completed-task-page">
         <div className="row mb-2">
           <div className="px-0 overflow-hidden completed-task-shell">
@@ -406,7 +580,11 @@ export default function CompletedTasks() {
                       isLast={idx === filteredTasks.length - 1}
                       isSelectMode={isSelectMode}
                       isSelected={selectedTaskIds.includes(task.task_id)}
+                      isExpanded={isTaskExpanded(task)}
+                      isOutputExpanded={isTaskOutputExpanded(task)}
                       onToggleSelect={toggleTaskSelection}
+                      onToggleExpanded={(taskId) => updateTaskExpanded(taskId, !isTaskExpanded(task))}
+                      onToggleOutput={(taskId) => updateTaskOutputExpanded(taskId, !isTaskOutputExpanded(task))}
                       onCopy={(task) => copyCommand(task, addToast)}
                       onRestart={(task) => restartTask(task.task_id, addToast)}
                       onDownload={(task) => downloadLog(task.task_id, addToast)}

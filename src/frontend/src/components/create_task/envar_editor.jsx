@@ -7,6 +7,16 @@ import React, {
 } from "react";
 import { API_URL } from "../../App";
 
+const ENV_VAR_PRESETS = [
+  { key: "ant_task_id", value: '"uuid.uuid4()"', label: "ant_task_id", defaultLabel: "uuid.uuid4()" },
+  { key: "ant_n_gpus", value: "0", label: "ant_n_gpus", defaultLabel: "0" },
+  { key: "ant_wd", value: '"./"', label: "ant_wd", defaultLabel: "./" },
+  { key: "ant_conda_env", value: "null", label: "ant_conda_env", defaultLabel: "None" },
+  { key: "ant_conda_env_path", value: "null", label: "ant_conda_env_path", defaultLabel: "None" },
+  { key: "ant_conda_path", value: '"conda"', label: "ant_conda_path", defaultLabel: "conda" },
+  { key: "custom", value: "", label: "custom", defaultLabel: "manual" },
+];
+
 function generateId() {
   return (
     Array.from(crypto.getRandomValues(new Uint8Array(8)))
@@ -21,6 +31,7 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
   const [mode, setMode] = useState("table"); // "table" or "textarea"
   const [textValue, setTextValue] = useState(""); 
   const [textError, setTextError] = useState(null); 
+  const [isPresetMenuOpen, setIsPresetMenuOpen] = useState(false);
   const savingRef = useRef(false);
 
   useEffect(() => {
@@ -179,13 +190,28 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
     getObject: () => rowsToObject(rows),
   }));
 
-  const handleAddRow = () => {
-    const id = generateId();
-    setRows((prev) => {
-      const next = [...prev, { id, key: "", value: "" }];
-      setTextValue(JSON.stringify(rowsToObject(next), null, 2));
-      return next;
-    });
+  const handleAddPreset = (preset) => {
+    const isCustom = preset.key === "custom";
+    const next = [
+      ...rows,
+      {
+        id: generateId(),
+        key: isCustom ? "" : preset.key,
+        value: isCustom ? "" : preset.value,
+      },
+    ];
+
+    setPresetMenuOpen(false);
+    setRows(next);
+    setTextValue(JSON.stringify(rowsToObject(next), null, 2));
+
+    if (!isCustom) {
+      commitSaveRows(next).catch((e) => console.error("Save after add preset failed:", e));
+    }
+  };
+
+  const setPresetMenuOpen = (open) => {
+    setIsPresetMenuOpen(open);
   };
 
   const handleDelete = async (id) => {
@@ -237,6 +263,7 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
   };
 
   const toggleMode = () => {
+    setPresetMenuOpen(false);
     if (mode === "table") {
       setTextValue(JSON.stringify(rowsToObject(rows), null, 2));
       setTextError(null);
@@ -264,6 +291,11 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
       }
     }
   };
+
+  const existingPresetKeys = new Set(rows.map((row) => (row.key || "").trim()).filter(Boolean));
+  const availablePresets = ENV_VAR_PRESETS.filter(
+    (preset) => preset.key === "custom" || !existingPresetKeys.has(preset.key)
+  );
 
   return (
     <div className="">
@@ -352,9 +384,30 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
               </tbody>
             </table>
             <div className="d-flex justify-content-center align-items-center">
-              <button type="button" className="btn btn-link me-2" onClick={handleAddRow} disabled={mode !== "table"}>
-                + Add Variable
-              </button>
+              <div className="env-var-add-menu">
+                <button
+                  type="button"
+                  className="btn btn-link me-2 dropdown-toggle"
+                  onClick={() => setPresetMenuOpen(!isPresetMenuOpen)}
+                  disabled={mode !== "table"}
+                  aria-expanded={isPresetMenuOpen}
+                >
+                  + Add Variable
+                </button>
+                <div className={`dropdown-menu env-var-preset-menu ${isPresetMenuOpen ? "show" : ""}`}>
+                  {availablePresets.map((preset) => (
+                    <button
+                      type="button"
+                      key={preset.key}
+                      className="dropdown-item env-var-preset-item"
+                      onClick={() => handleAddPreset(preset)}
+                    >
+                      <span className="env-var-preset-key">{preset.label}</span>
+                      <span className="env-var-preset-default">{preset.defaultLabel}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         ) : (

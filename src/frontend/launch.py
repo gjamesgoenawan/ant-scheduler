@@ -161,6 +161,7 @@ async def ongoing_task_page():
 async def completed_task_page():
     return await send_from_directory(app.static_folder, "index.html")
 
+@app.route("/logs")
 @app.route("/logs/")
 async def logs():
     return await send_from_directory(app.static_folder, "index.html")

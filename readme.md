@@ -109,7 +109,7 @@ python myscript.py --seed {rand float 3.4 6.4}
 #### Queue Multiple Commands
 ANT also support queuing multiple commands. To achieve this, select the "Multi" queue mode in the `Create New Task` page. Multiple commands can be seperated using new lines & each command can be extended to the following lines by adding `\` at the end (just like you would on terminals). Lines with leading `#` will be ignored.  
 
-To configure running parameters, there two arguments can be used:
+To configure running parameters, there are two arguments can be used:
 `ant_n_gpus : int = 1` & `ant_task_id : str = uuid.uuid4()`
 
 ```
@@ -121,7 +121,7 @@ ant_n_gpus=2 python second_task.py \
 --batch_size 8
 python thrid_task.py
 ```
->Note that if multiple ANT arguments present, the only the last one will take effect. If none is present, the default value (randomized task_id & 0 n_gpus) will be used
+>Note that if multiple ANT arguments present, only the last one will take effect. If none is present, the default value (randomized task_id & 0 n_gpus) will be used
 
 #### Special environment variable
 In previous versions of ant, commands can be very long and tedious to set up, hence we have integrated several special environment variables to improve QOL.
@@ -131,7 +131,8 @@ In previous versions of ant, commands can be very long and tedious to set up, he
 | `ant_task_id` | set task id | will override `Task ID` input in `Single` queue mode | `uuid.uuid4()` |
 | `ant_n_gpus` | set task id | will override `Number of GPUs` input in `Single` queue mode | 0 (can be adjusted in config) |
 | `ant_wd` | set the working directory of the script | invoke `cd` before your command | `./` |
-| `ant_conda_env` | set / activate a conda environment | invoke `conda run` before your command | `None` |
+| `ant_conda_env` | set / activate a conda environment | invoke `conda run --live-stream -n` before your command | `None` |
+| `ant_conda_env_path` | set / activate a conda environment by path | invoke `conda run --live-stream -p` before your command | `None` |
 | `ant_conda_path` | change conda executable path | invoke the specified conda executable.  Should point to `your/path/bin/conda`| `conda` |
 
 Hence, instead of appending:

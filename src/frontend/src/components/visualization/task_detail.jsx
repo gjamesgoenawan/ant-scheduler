@@ -12,13 +12,27 @@ export default function TaskDetail({
   outputMinHeight = "300px",
   collapsible = false,
   defaultExpanded = true,
+  expanded,
+  onExpandedChange,
   loading = false,
   notFound = false,
   loadingMessage = "Loading task details...",
   notFoundMessage = null,
 }) {
   const terminalRef = useRef(null);
-  const [showDetails, setShowDetails] = useState(defaultExpanded);
+  const [localShowDetails, setLocalShowDetails] = useState(defaultExpanded);
+  const isControlled = expanded !== undefined;
+  const showDetails = isControlled ? expanded : localShowDetails;
+
+  const setShowDetails = (nextValue) => {
+    const next = typeof nextValue === "function" ? nextValue(showDetails) : nextValue;
+    if (!isControlled) {
+      setLocalShowDetails(next);
+    }
+    if (onExpandedChange) {
+      onExpandedChange(next);
+    }
+  };
 
   useEffect(() => {
     if (!collapsible || outputType !== "terminal" || !showDetails) return;

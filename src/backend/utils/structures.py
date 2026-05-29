@@ -163,6 +163,10 @@ class AntTask():
                           with_envar: bool = True) -> str:
         wd = None
         conda_env = None
+        conda_env_path = None
+
+        def has_runtime_value(value):
+            return value is not None and str(value).strip().lower() not in {"", "none", "null"}
 
         if with_envar:
             envar = copy.deepcopy(self.envar)
@@ -175,11 +179,17 @@ class AntTask():
             if 'ant_conda_env' in envar:
                 conda_env = envar['ant_conda_env']
                 del envar['ant_conda_env']
+
+            if 'ant_conda_env_path' in envar:
+                conda_env_path = envar['ant_conda_env_path']
+                del envar['ant_conda_env_path']
             
             if 'ant_conda_path' in envar:
                 # use custom conda path
                 cp = envar['ant_conda_path']
                 del envar['ant_conda_path']
+                if not has_runtime_value(cp):
+                    cp = 'conda'
             else:
                 # use default conda
                 cp = 'conda'
@@ -199,10 +209,12 @@ class AntTask():
                 envar_text = 'export ' + self.parse_random(envar_text) + '; '
             
             final_c = envar_text
-            if wd is not None:
-                final_c += f'cd {wd} && '
-            if conda_env is not None:
-                final_c += f'{cp} run -n {conda_env} --live-stream '
+            if has_runtime_value(wd):
+                final_c += f'cd {ensure_string_literal(wd)} && '
+            if has_runtime_value(conda_env_path):
+                final_c += f'{ensure_string_literal(cp)} run --live-stream -p {ensure_string_literal(conda_env_path)} '
+            elif has_runtime_value(conda_env):
+                final_c += f'{ensure_string_literal(cp)} run --live-stream -n {ensure_string_literal(conda_env)} '
             final_c += self.command
             return final_c
 

@@ -57,6 +57,15 @@ class gpu_runner(base_runner):
 
         self.logger.info(f"GPURunner initialized: GPUs={list2str(self.gpu_ids)}")
 
+    @staticmethod
+    def _normalize_task_id_override(value):
+        if value is None:
+            return None
+        value = str(value).strip()
+        if value == "" or value.lower() in {"none", "null", "uuid.uuid4()"}:
+            return None
+        return value
+
     def _ADGS_check(self) -> None:
         """
         ADGS Detection Logic
@@ -584,19 +593,31 @@ class gpu_runner(base_runner):
                 command = data.get('command', None) # this has to be present, if not AntTask can't initialize
                 
                 # try parsing gpu_runner-specific args from envar
+                if 'ant_task_id' in envar:
+                    task_id_from_envar = self._normalize_task_id_override(envar['ant_task_id'])
+                    del envar['ant_task_id']
+                else:
+                    task_id_from_envar = None
+
                 if 'ant_n_gpus' in envar:
                     n_gpus_from_envar = envar['ant_n_gpus']
                     del envar['ant_n_gpus']
                 else:
-                    n_gpus_from_envar = self.opt.get("RUNNER_default_n_gpus", 0)
+                    n_gpus_from_envar = None
                 
                 # try parsing gpu_runner-specific args from cmd
                 n_gpus_from_cmd, task_id_from_cmd, envar_from_cmd, cleaned_c = self.parse_args(command)
                 envar.update(envar_from_cmd)
                 
                 # if args from cmd present, prioritize it.
-                data['n_gpus'] = n_gpus_from_cmd or n_gpus_from_envar or data.get('n_gpus', self.opt.get("RUNNER_default_n_gpus", 0))
-                task_id = task_id_from_cmd or task_id
+                data['n_gpus'] = (
+                    n_gpus_from_cmd
+                    if n_gpus_from_cmd is not None
+                    else n_gpus_from_envar
+                    if n_gpus_from_envar is not None
+                    else data.get('n_gpus', self.opt.get("RUNNER_default_n_gpus", 0))
+                )
+                task_id = task_id_from_cmd or task_id_from_envar or task_id
 
                 # randomize uuid lmao
                 if task_id is None:
@@ -617,6 +638,9 @@ class gpu_runner(base_runner):
                 task_id = data.get('task_id', None)
             
                 # try parsing gpu_runner-specific args from envar
+                if 'ant_task_id' in envar:
+                    del envar['ant_task_id']
+
                 if 'ant_n_gpus' in envar:
                     n_gpus_from_envar = envar['ant_n_gpus']
                     del envar['ant_n_gpus']
