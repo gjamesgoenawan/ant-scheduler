@@ -8,7 +8,7 @@ import React, {
 import { API_URL } from "../../App";
 
 const ENV_VAR_PRESETS = [
-  { key: "ant_task_id", value: '"uuid.uuid4()"', label: "ant_task_id", defaultLabel: "uuid.uuid4()" },
+  { key: "ant_task_id", value: '"[uuid]"', label: "ant_task_id", defaultLabel: "[uuid]" },
   { key: "ant_n_gpus", value: "0", label: "ant_n_gpus", defaultLabel: "0" },
   { key: "ant_wd", value: '"./"', label: "ant_wd", defaultLabel: "./" },
   { key: "ant_conda_env", value: "null", label: "ant_conda_env", defaultLabel: "None" },

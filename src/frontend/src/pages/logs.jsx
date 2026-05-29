@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 
-import { useMonitorData, API_URL } from "../App";
+import { useMonitorData } from "../App";
 import Layout, { useToast } from "../components/layout/layout";
 import {
   copyCommand,
@@ -11,6 +11,7 @@ import {
   restartTask,
 } from "../utils/taskActions";
 import TaskDetail from "../components/visualization/task_detail";
+import { fetchLogContent } from "../utils/logFetch";
 
 
 function Logs() {
@@ -68,20 +69,9 @@ function Logs() {
   // get the log
   useEffect(() => {
     if (taskId && !taskNotFound) { 
-      fetch(`${API_URL}/get_log?task_id=${encodeURIComponent(taskId)}`)
-        .then(async (res) => {
-          const payload = await res.json().catch(() => null);
-          if (!res.ok) {
-             throw new Error(payload?.message || payload?.data || "Failed to load logs.");
-          }
-          return payload;
-        })
-        .then((data) => {
-          if (data.status === "success") {
-            setLogs(data.data);
-          } else {
-            setLogs(data.message || "Failed to load logs.");
-          }
+      fetchLogContent(taskId)
+        .then((content) => {
+          setLogs(content);
         })
         .catch((err) => {
           console.error(err);

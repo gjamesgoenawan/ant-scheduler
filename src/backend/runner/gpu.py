@@ -11,7 +11,8 @@ from logger import base_logger
 from monitor import ThreadedMonitor
 from utils.misc import (handle_singular_or_plural, list2str,
                         parse_and_truncate_file, split_commands,
-                        sanitize_task_id, increment_task_id)
+                        sanitize_task_id, increment_task_id,
+                        render_task_id_template)
 from utils.structures import AntTask
 
 from . import base_runner
@@ -62,7 +63,7 @@ class gpu_runner(base_runner):
         if value is None:
             return None
         value = str(value).strip()
-        if value == "" or value.lower() in {"none", "null", "uuid.uuid4()"}:
+        if value == "" or value.lower() in {"none", "null"}:
             return None
         return value
 
@@ -622,6 +623,8 @@ class gpu_runner(base_runner):
                 # randomize uuid lmao
                 if task_id is None:
                     task_id = str(uuid.uuid4())
+
+                task_id = render_task_id_template(task_id)
                 
                 task_id = sanitize_task_id(task_id=task_id)
 
@@ -639,7 +642,10 @@ class gpu_runner(base_runner):
             
                 # try parsing gpu_runner-specific args from envar
                 if 'ant_task_id' in envar:
+                    task_id_from_envar = self._normalize_task_id_override(envar['ant_task_id'])
                     del envar['ant_task_id']
+                else:
+                    task_id_from_envar = None
 
                 if 'ant_n_gpus' in envar:
                     n_gpus_from_envar = envar['ant_n_gpus']
@@ -656,13 +662,15 @@ class gpu_runner(base_runner):
                     envar.update(envar_from_cmd)
 
                     # randomize uuid lmao
-                    if task_id_from_cmd is None:
-                        task_id_from_cmd = str(uuid.uuid4())
+                    resolved_task_id = task_id_from_cmd or task_id_from_envar or task_id
+                    if resolved_task_id is None:
+                        resolved_task_id = str(uuid.uuid4())
 
-                    task_id_from_cmd = sanitize_task_id(task_id=task_id_from_cmd)
+                    resolved_task_id = render_task_id_template(resolved_task_id)
+                    resolved_task_id = sanitize_task_id(task_id=resolved_task_id)
                         
                     tasks.append(AntTask(command=cleaned_c,
-                                         task_id=task_id_from_cmd,
+                                         task_id=resolved_task_id,
                                          n_gpus=n_gpus,
                                          envar=envar))
             else:

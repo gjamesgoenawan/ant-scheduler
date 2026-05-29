@@ -110,7 +110,7 @@ python myscript.py --seed {rand float 3.4 6.4}
 ANT also support queuing multiple commands. To achieve this, select the "Multi" queue mode in the `Create New Task` page. Multiple commands can be seperated using new lines & each command can be extended to the following lines by adding `\` at the end (just like you would on terminals). Lines with leading `#` will be ignored.  
 
 To configure running parameters, there are two arguments can be used:
-`ant_n_gpus : int = 1` & `ant_task_id : str = uuid.uuid4()`
+`ant_n_gpus : int = 1` & `ant_task_id : str = "[uuid]"`
 
 ```
 # Running three commands with partially-defined parameters:
@@ -128,12 +128,55 @@ In previous versions of ant, commands can be very long and tedious to set up, he
 
 | Variable | Goal | What it actually does| Defaults |
 | - | - | - | - |
-| `ant_task_id` | set task id | will override `Task ID` input in `Single` queue mode | `uuid.uuid4()` |
+| `ant_task_id` | set task id | will override `Task ID` input in `Single` queue mode; supports task-id templates | `[uuid]` |
 | `ant_n_gpus` | set task id | will override `Number of GPUs` input in `Single` queue mode | 0 (can be adjusted in config) |
 | `ant_wd` | set the working directory of the script | invoke `cd` before your command | `./` |
 | `ant_conda_env` | set / activate a conda environment | invoke `conda run --live-stream -n` before your command | `None` |
 | `ant_conda_env_path` | set / activate a conda environment by path | invoke `conda run --live-stream -p` before your command | `None` |
 | `ant_conda_path` | change conda executable path | invoke the specified conda executable.  Should point to `your/path/bin/conda`| `conda` |
+
+#### Task ID Templates
+Task IDs still have to be unique after expansion. ANT now supports templates in both of the following places:
+
+- the `Task ID` input in `Single` queue mode
+- the `ant_task_id` environment variable
+- `ant_task_id=...` embedded directly in a command
+
+Templates are resolved right before ANT validates duplicates and adds the task to the queue.
+
+Supported placeholders:
+
+| Placeholder | Meaning | Example expansion |
+| - | - | - |
+| `[uuid]` or `uuid.uuid4()` | full UUID | `7f6e0c55-8d98-4f56-bd0e-c0fd07a7f8bd` |
+| `[uuid8]` | first 8 hex chars of a UUID | `7f6e0c55` |
+| `[date]` | local date in `YYYYMMDD` | `20260529` |
+| `[time]` | local time in `HHMMSS` | `235901` |
+| `[datetime]` | local datetime in `YYYYMMDD-HHMMSS` | `20260529-235901` |
+| `[random_phrase]` or `[phrase]` | random two-word slug | `amber-falcon` |
+| `[randint:START:END]` | random integer in inclusive range | `4831` |
+
+You can freely mix literal text and placeholders:
+
+```bash
+ant_task_id="experiment-[random_phrase]" python train.py
+ant_task_id="teacher-[date]-[uuid8]" python train.py
+ant_task_id="ablation-[randint:1000:9999]" python train.py
+```
+
+Practical notes:
+
+- `experiment-[random_phrase]` is supported exactly as written.
+- Multiple placeholders can be used in the same task id.
+- In `Multi` queue mode, the template is expanded once per command, so `[random_phrase]` and `[uuid]` will produce different task ids for different queued commands.
+- Duplicate checks run after expansion. If your final rendered task id already exists in running, queued, or completed history, ANT will still reject it.
+- Unknown placeholders will cause task creation to fail with an explicit error message.
+
+If you want a readable but still unique task id, a good default is:
+
+```bash
+ant_task_id="experiment-[random_phrase]-[uuid8]"
+```
 
 Hence, instead of appending:
 ```
@@ -142,6 +185,7 @@ cd /my/work/dir && /home/anaconda/bin/conda run --live-stream -n my_env mycomman
 You can simply use the following environment variable in the `Create New Task` page:
 | Variable | Value |
 | - | - |
+| `ant_task_id` | `experiment-[random_phrase]` |
 | `ant_wd` | `/my/work/dir` |
 | `ant_conda_env` | `my_env` |
 | `ant_conda_path` | `/home/anaconda/bin/conda` |

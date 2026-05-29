@@ -24,11 +24,18 @@ async def proxy(path):
         return Response("Upgrade handled on /socket.io/", status=426)
 
     async with httpx.AsyncClient() as client:
+        forward_headers = {
+            k: v
+            for k, v in request.headers.items()
+            if k.lower() not in {"host", "accept-encoding"}
+        }
+        # Force identity encoding so the proxy never forwards compressed log bytes as plain text.
+        forward_headers["accept-encoding"] = "identity"
         backend_url = f"{BACKEND_URL}/{path}"
         resp = await client.request(
             request.method,
             backend_url,
-            headers={k: v for k, v in request.headers.items() if k.lower() != "host"},
+            headers=forward_headers,
             content=await request.get_data(),
             params=request.args
         )

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Layout, { useToast } from "../components/layout/layout";
-import { API_URL, useMonitorData } from "../App";
+import { useMonitorData } from "../App";
 import {
   bulkDeleteTasks,
   bulkDownloadLogs,
@@ -15,24 +15,10 @@ import {
   readBooleanMap,
   writeBooleanMap,
 } from "../utils/persistedTaskState";
+import { fetchLogContent } from "../utils/logFetch";
 
 const COMPLETED_DETAIL_STORAGE_KEY = "antScheduler.completedTasks.detailExpanded";
 const COMPLETED_OUTPUT_STORAGE_KEY = "antScheduler.completedTasks.outputExpanded";
-
-async function fetchTaskLog(taskId) {
-  const res = await fetch(`${API_URL}/get_log?task_id=${encodeURIComponent(taskId)}`);
-  const payload = await res.json().catch(() => null);
-
-  if (!res.ok) {
-    throw new Error(payload?.message || payload?.data || "Failed to load logs.");
-  }
-
-  if (payload?.status === "success") {
-    return payload.data || "";
-  }
-
-  throw new Error(payload?.message || payload?.data || "Failed to load logs.");
-}
 
 const TaskRow = ({
   task,
@@ -60,7 +46,7 @@ const TaskRow = ({
     setOutputLoading(true);
     setOutputError(null);
 
-    fetchTaskLog(task.task_id)
+    fetchLogContent(task.task_id)
       .then((content) => {
         if (cancelled) return;
         setOutputContent(content);
