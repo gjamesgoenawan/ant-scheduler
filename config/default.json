@@ -10,6 +10,9 @@
 
     "RUNNER_default_n_gpus" : 0,
 
+    "RECOVERY_enabled": true,
+    "RECOVERY_state_file": "./ant_runner_logs/ant_recovery_state.json",
+
     "LOGGER_log_dir": "./ant_runner_logs",
     "LOGGER_log_to_file": true,
     "LOGGER_log_to_stdout": true,
@@ -28,6 +31,10 @@
     "VISUALIZER_log_max_height": 20,
     "VISUALIZER_log_max_width": "inf",
     "VISUALIZER_terminal_win_height": 20,
+    "VISUALIZER_ongoing_output_line_control_enabled": true,
+    "VISUALIZER_completed_output_line_control_enabled": true,
     "VISUALIZER_completed_output_default_lines": 50,
+    "VISUALIZER_output_min_lines": 1,
+    "VISUALIZER_output_max_lines": 10,
     "VISUALIZER_view_log_max_lines": 200
 }

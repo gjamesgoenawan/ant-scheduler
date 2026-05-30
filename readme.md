@@ -59,6 +59,8 @@ Current sample config:
   "runner": "gpu_runner",
   "visualizer": "flask_visualizer",
   "RUNNER_default_n_gpus": 0,
+  "RECOVERY_enabled": true,
+  "RECOVERY_state_file": "./ant_runner_logs/ant_recovery_state.json",
   "LOGGER_log_dir": "./ant_runner_logs",
   "LOGGER_log_to_file": true,
   "LOGGER_log_to_stdout": true,
@@ -72,8 +74,12 @@ Current sample config:
   "HANDLER_pipe_to_file": true,
   "VISUALIZER_log_max_height": 20,
   "VISUALIZER_log_max_width": "inf",
-  "VISUALIZER_terminal_win_height": 50,
+  "VISUALIZER_terminal_win_height": 20,
+  "VISUALIZER_ongoing_output_line_control_enabled": true,
+  "VISUALIZER_completed_output_line_control_enabled": true,
   "VISUALIZER_completed_output_default_lines": 50,
+  "VISUALIZER_output_min_lines": 2,
+  "VISUALIZER_output_max_lines": 12,
   "VISUALIZER_view_log_max_lines": 200
 }
 ```
@@ -91,6 +97,8 @@ Field-by-field explanation:
 | `runner` | Scheduler implementation. | `gpu_runner` is the core GPU-aware scheduler that validates requests and dispatches jobs. |
 | `visualizer` | Web/API visualization backend. | `flask_visualizer` is the backend that powers `/vis`, `/get_log`, socket updates, and the React UI. |
 | `RUNNER_default_n_gpus` | Fallback GPU count when a task does not explicitly request one. | Applies when neither the form nor `ant_n_gpus` nor inline command args specify GPU count. `0` means CPU-only by default. |
+| `RECOVERY_enabled` | Enables task state snapshots for restart recovery. | When `true`, ANT writes queued, ongoing, and completed task metadata to `RECOVERY_state_file` so the browser can offer restoration after `run.py` is interrupted. |
+| `RECOVERY_state_file` | JSON file used for scheduler recovery snapshots. | Keep this under `LOGGER_log_dir` or another persistent local directory. The file stores task metadata and log-file paths, not the full log content. |
 | `LOGGER_log_dir` | Root directory for ANT-managed log files. | Every task log is created under this folder, grouped by timestamped subdirectory. |
 | `LOGGER_log_to_file` | Whether ANT writes task output to files. | Keep this `true` if you want the Completed/Logs pages and download actions to work reliably. |
 | `LOGGER_log_to_stdout` | Whether ANT also mirrors task logs to ANT's own stdout. | Useful when supervising ANT from tmux/systemd and wanting aggregated console output. |
@@ -105,7 +113,11 @@ Field-by-field explanation:
 | `VISUALIZER_log_max_height` | Legacy/default log height hint. | Mostly affects older visualization assumptions; modern React pages rely more on CSS and the newer line-count settings. |
 | `VISUALIZER_log_max_width` | Legacy/default log width hint. | Usually safe to leave as `"inf"`; rarely changed in the current UI. |
 | `VISUALIZER_terminal_win_height` | Number of live lines the backend keeps for ongoing-task terminal snapshots. | This is the effective live-output window for the Ongoing Tasks page. Raising it increases socket payload size every scheduler tick. |
+| `VISUALIZER_ongoing_output_line_control_enabled` | Shows or hides the Ongoing Tasks `Live Lines` slider and number input. | When enabled, each browser remembers its chosen live-line count in local storage. When disabled, the page uses `VISUALIZER_terminal_win_height`. |
+| `VISUALIZER_completed_output_line_control_enabled` | Shows or hides the Completed Tasks `Output Lines` slider and number input. | When enabled, each browser remembers its chosen completed-output line count in local storage. When disabled, the page uses `VISUALIZER_completed_output_default_lines`. |
 | `VISUALIZER_completed_output_default_lines` | Default number of lines shown in Completed Tasks Output panels. | The page-level `Output Lines` slider starts from this value, but users can adjust it per browser and the choice is remembered locally. |
+| `VISUALIZER_output_min_lines` | Minimum visible height of Ongoing/Completed output panels, measured in terminal lines. | Defaults to `2`, so small outputs no longer reserve a large blank terminal area. |
+| `VISUALIZER_output_max_lines` | Maximum visible height of Ongoing/Completed output panels before scrolling, measured in terminal lines. | Defaults to `12`; output beyond this height scrolls inside the panel and auto-scrolls to the latest line. |
 | `VISUALIZER_view_log_max_lines` | Maximum number of lines ANT will serve for truncated log views. | Caps Completed Task output previews and non-full log fetches. Raising it increases response size and frontend render cost. |
 
 Recommended tuning notes:
@@ -113,6 +125,7 @@ Recommended tuning notes:
 - If Completed Tasks feels heavy, lower `VISUALIZER_view_log_max_lines` first. That directly limits how much text the browser can request and render per task preview.
 - If live updates feel heavy, lower `VISUALIZER_terminal_win_height`. This reduces the number of terminal lines sent to every connected browser on each `/vis` update.
 - `VISUALIZER_completed_output_default_lines` only changes the initial Completed preview window; it is a UX default, not the hard cap.
+- `VISUALIZER_output_min_lines` and `VISUALIZER_output_max_lines` control panel height only. They do not control how many log lines are fetched or retained.
 - Changing `backend_port` or `frontend_port` usually requires restarting ANT so both child processes pick up the new values.
 
 ### Test Run 
@@ -123,6 +136,22 @@ echo "Hello World from ANT!"
 Hit the `SUBMIT` button and watch your commands got executed! ANT will also automatically save your stdout logs (similar to using `tee` or `>>`). Under default configurations, the logs will be saved at `./ant_runner_logs`.
 
 Intuitively, you can view all ongoing and completed tasks in their respectives tabs. There, you can easily view terminal logs, download, copy-commands, etc.
+
+### Task Recovery after `run.py` interruption
+
+When `RECOVERY_enabled` is `true`, ANT continuously snapshots task metadata to `RECOVERY_state_file`. If `run.py` is interrupted or the backend exits while work is queued/running, the next browser session opens a recovery dialog.
+
+The dialog separates candidates into three groups:
+
+- Interrupted Ongoing Tasks: tasks that were running when the backend disappeared. On normal `SIGTERM`/`Ctrl+C` shutdown, ANT saves the recovery snapshot and terminates worker subprocesses before exit. ANT cannot reattach to old subprocesses after restart, so selected tasks are added back to the queue with the same task id and command.
+- Queued Tasks: tasks that were waiting in the in-memory queue. Selected tasks are added back to the queue.
+- Completed Tasks: completed-history entries from the snapshot. Selected tasks are restored to the Completed Tasks page, including their saved log-file paths when the logs still exist.
+
+After you click `Restore Selected` or `Dismiss`, ANT rewrites the snapshot with the current scheduler state. If you dismiss recovery, the old candidates are intentionally cleared.
+
+### Queue ordering
+
+Each row in Queued Tasks has a delete button and a move-to-top button. The move-to-top button promotes that task to the front of the queue without changing its task id, command, GPU request, or environment variables.
 
 # Usage Guide
 ## Basic

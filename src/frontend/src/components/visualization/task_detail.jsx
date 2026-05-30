@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { buildOutputWindowStyle } from "../../utils/outputWindow";
 
 export default function TaskDetail({
   taskId,
@@ -10,6 +11,8 @@ export default function TaskDetail({
   outputType = "log",
   outputContent = "",
   outputMinHeight = "300px",
+  outputMinLines = null,
+  outputMaxLines = null,
   collapsible = false,
   defaultExpanded = true,
   expanded,
@@ -55,7 +58,9 @@ export default function TaskDetail({
   const shouldShowDetails = collapsible ? showDetails : true;
   const outputShellStyle =
     outputType === "terminal"
-      ? { minHeight: "180px", maxHeight: "250px" }
+      ? outputMinLines && outputMaxLines
+        ? buildOutputWindowStyle(outputMinLines, outputMaxLines)
+        : { minHeight: "180px", maxHeight: "250px" }
       : { minHeight: outputMinHeight };
 
   const titleNode = (

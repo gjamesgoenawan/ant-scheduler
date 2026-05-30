@@ -20,6 +20,7 @@ import {
 } from "../utils/persistedTaskState";
 import { fetchLogContent } from "../utils/logFetch";
 import { clampLineCount, takeLastLinesFromText } from "../utils/lineCount";
+import { buildOutputWindowStyle, getOutputWindowLines } from "../utils/outputWindow";
 
 const COMPLETED_DETAIL_STORAGE_KEY = "antScheduler.completedTasks.detailExpanded";
 const COMPLETED_OUTPUT_STORAGE_KEY = "antScheduler.completedTasks.outputExpanded";
@@ -43,6 +44,7 @@ const TaskRow = ({
   onDownload,
   outputLineCount,
   outputFetchLineCount,
+  outputShellStyle,
 }) => {
   const initialCacheEntry = completedTaskOutputCache.get(task.task_id);
   const [outputContent, setOutputContent] = useState(initialCacheEntry?.content || "");
@@ -332,7 +334,7 @@ const TaskRow = ({
               </div>
 
               {isOutputExpanded ? (
-                <div className="bg-black text-light p-3 rounded completed-task-output-shell" ref={outputShellRef}>
+                <div className="bg-black text-light p-3 rounded completed-task-output-shell" ref={outputShellRef} style={outputShellStyle}>
                   <pre className="completed-task-output-pre">
                     {outputLoading && !outputContent
                       ? "Loading output..."
@@ -372,12 +374,15 @@ export default function CompletedTasks() {
     outputLineCap,
     50
   );
+  const lineControlEnabled = data?.visualizer?.completed_output_line_control_enabled !== false;
   const effectiveOutputLineCount = clampLineCount(
-    outputLineCount ?? defaultOutputLineCount,
+    lineControlEnabled ? outputLineCount ?? defaultOutputLineCount : defaultOutputLineCount,
     1,
     outputLineCap,
     defaultOutputLineCount
   );
+  const { minLines: outputMinLines, maxLines: outputMaxLines } = getOutputWindowLines(data?.visualizer);
+  const outputShellStyle = buildOutputWindowStyle(outputMinLines, outputMaxLines);
   const outputFetchLineCount = Math.min(
     outputLineCap,
     Math.max(
@@ -497,14 +502,16 @@ export default function CompletedTasks() {
 
   const pageActions = (
     <>
-      <LineCountControl
-        label="Output Lines"
-        value={effectiveOutputLineCount}
-        min={1}
-        max={outputLineCap}
-        disabled={completedTasks.length === 0}
-        onChange={handleOutputLineCountChange}
-      />
+      {lineControlEnabled ? (
+        <LineCountControl
+          label="Output Lines"
+          value={effectiveOutputLineCount}
+          min={1}
+          max={outputLineCap}
+          disabled={completedTasks.length === 0}
+          onChange={handleOutputLineCountChange}
+        />
+      ) : null}
       <button
         type="button"
         className="btn btn-outline-dark page-action-btn mb-0 d-flex align-items-center gap-1"
@@ -684,6 +691,7 @@ export default function CompletedTasks() {
                       onDelete={(task) => deleteTask(task.task_id, addToast)}
                           outputLineCount={effectiveOutputLineCount}
                         outputFetchLineCount={outputFetchLineCount}
+                        outputShellStyle={outputShellStyle}
                   />
                   ))
               )}

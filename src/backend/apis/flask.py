@@ -2,7 +2,10 @@ import eventlet
 
 eventlet.monkey_patch()
 
+import atexit
 import os
+import signal
+import sys
 import threading
 import traceback
 
@@ -21,6 +24,31 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 r = None
 runner_lock = threading.Lock()
+shutdown_started = False
+
+def shutdown_runner(signum=None, frame=None):
+    global shutdown_started
+    if shutdown_started:
+        return
+    shutdown_started = True
+
+    if r is None:
+        return
+
+    try:
+        if hasattr(r, "persist_recovery_snapshot"):
+            has_pending_recovery = getattr(r, "_has_pending_recovery", lambda: False)()
+            r.persist_recovery_snapshot(force=not has_pending_recovery)
+    except Exception:
+        traceback.print_exc()
+
+    try:
+        r.handler.reset()
+    except Exception:
+        traceback.print_exc()
+
+    if signum is not None:
+        sys.exit(0)
 
 # ---- Utility for thread-safe execution ----
 def safe_runner_call(func, *args, **kwargs):
@@ -73,6 +101,14 @@ def remove_task_from_queue():
         return jsonify({"status": "error", "message": "task_ids is required"}), 400
     return safe_runner_call(r.remove_task_from_queue, task_ids)
 
+@app.route("/promote_task_in_queue", methods=["POST"])
+def promote_task_in_queue():
+    data = request.get_json(force=True)
+    task_ids = data.get("task_ids")
+    if not task_ids:
+        return jsonify({"status": "error", "message": "task_ids is required"}), 400
+    return safe_runner_call(r.promote_task_in_queue, task_ids)
+
 @app.route("/remove_task_from_history", methods=["POST"])
 def remove_task_from_history():
     data = request.get_json(force=True)
@@ -84,6 +120,19 @@ def remove_task_from_history():
 @app.route("/vis", methods=["GET"])
 def vis():
     return safe_runner_call(r.vis)
+
+@app.route("/recovery_state", methods=["GET"])
+def recovery_state():
+    return safe_runner_call(r.get_recovery_state)
+
+@app.route("/restore_recovery", methods=["POST"])
+def restore_recovery():
+    data = request.get_json(force=True)
+    return safe_runner_call(r.restore_recovery, data)
+
+@app.route("/dismiss_recovery", methods=["POST"])
+def dismiss_recovery():
+    return safe_runner_call(r.dismiss_recovery)
 
 @app.route("/toggle_allowed_gpu", methods=["POST"])
 def toggle_allowed_gpu():
@@ -159,10 +208,14 @@ def get_log_file():
     if filename is None:
         return jsonify({"status": "error", "message": "Log file not found"}), 400
 
-    if r.opt['LOGGER_log_dir'] in os.path.dirname(filename):
+    log_root = os.path.realpath(os.path.abspath(r.opt.get('LOGGER_log_dir', './ant_runner_logs')))
+    requested_file = os.path.realpath(os.path.abspath(filename))
+    requested_dir = os.path.dirname(requested_file)
+
+    if os.path.commonpath([log_root, requested_file]) == log_root:
         return send_from_directory(
-            os.path.abspath(os.path.dirname(filename)),
-            os.path.basename(filename),
+            requested_dir,
+            os.path.basename(requested_file),
             as_attachment=True 
         )
     else:
@@ -205,6 +258,9 @@ def emit_vis_data():
 def run_api(runner, debug: bool = False):
     global r
     r = runner
+    atexit.register(shutdown_runner)
+    signal.signal(signal.SIGTERM, shutdown_runner)
+    signal.signal(signal.SIGINT, shutdown_runner)
     threading.Thread(target=emit_vis_data, daemon=True).start()
 
     host = "0.0.0.0"

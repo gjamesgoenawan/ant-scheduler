@@ -108,6 +108,30 @@ class AntTask():
             for t in include_time:
                 d['time'][t] = self.get_time(type=t, formatted=formatted)
         return d
+
+    def to_state_dict(self):
+        return dict(self)
+
+    @classmethod
+    def from_state_dict(cls, data):
+        if not isinstance(data, dict):
+            raise TypeError("Task state must be a dictionary")
+
+        payload = dict(data)
+        command = payload.pop("command", "")
+        task_id = payload.pop("task_id", None)
+        envar = payload.pop("envar", None)
+        runner_envar = payload.pop("runner_envar", None)
+
+        task = cls(
+            command=command,
+            task_id=task_id,
+            envar=envar,
+            runner_envar=runner_envar,
+        )
+        for key, value in payload.items():
+            setattr(task, key, value)
+        return task
             
     def __repr__(self):
         f = f"""AntTask(command='{self.command}',task_id='{self.task_id}')"""

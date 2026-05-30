@@ -13,6 +13,7 @@ from utils.misc import (handle_singular_or_plural, list2str,
                         parse_and_truncate_file, read_last_n_lines, split_commands,
                         sanitize_task_id, increment_task_id,
                         render_task_id_template)
+from utils.recovery import RecoveryStore
 from utils.structures import AntTask
 
 from . import base_runner
@@ -38,6 +39,10 @@ class gpu_runner(base_runner):
         self.handler = handler
         self.logger = self.setup_logger(logger)
         self.loader = loader
+        self.recovery_enabled = self.opt.get("RECOVERY_enabled", True)
+        self.recovery_store = RecoveryStore(self.opt)
+        loaded_recovery = self.recovery_store.load() if self.recovery_enabled else RecoveryStore.empty_snapshot()
+        self.pending_recovery = loaded_recovery if RecoveryStore.has_tasks(loaded_recovery) else RecoveryStore.empty_snapshot()
 
         # Initialize GPU monitoring
         self.monitor = ThreadedMonitor(opt)
@@ -67,6 +72,104 @@ class gpu_runner(base_runner):
             return None
         return value
 
+    def _has_pending_recovery(self):
+        return self.recovery_enabled and RecoveryStore.has_tasks(self.pending_recovery)
+
+    def persist_recovery_snapshot(self, force: bool = False):
+        if not self.recovery_enabled:
+            return
+        if self._has_pending_recovery() and not force:
+            return
+        self.recovery_store.write(
+            queued=self.loader.get_queue(),
+            ongoing=self.task_ongoing.values(),
+            completed=self.task_completed,
+        )
+
+    @staticmethod
+    def _format_recovery_task(task_state, section):
+        task = AntTask.from_state_dict(task_state)
+        if section == "completed":
+            status = "Terminated" if task.terminated else "Completed"
+        elif section == "ongoing":
+            status = "Interrupted"
+        else:
+            status = "Queued"
+
+        return {
+            "task_id": task.task_id,
+            "status": status,
+            "start_time": task.get_time(type="start", formatted=True) or "-",
+            "duration": task.get_time(type="runtime", formatted=True),
+            "command": task.command,
+            "n_gpus": getattr(task, "n_gpus", 0),
+            "envar": task.envar,
+        }
+
+    def get_recovery_state(self):
+        snapshot = self.pending_recovery
+        return {
+            "pending": self._has_pending_recovery(),
+            "saved_at": snapshot.get("saved_at"),
+            "ongoing": [self._format_recovery_task(task, "ongoing") for task in snapshot.get("ongoing", [])],
+            "queued": [self._format_recovery_task(task, "queued") for task in snapshot.get("queued", [])],
+            "completed": [self._format_recovery_task(task, "completed") for task in snapshot.get("completed", [])],
+        }
+
+    def dismiss_recovery(self):
+        self.pending_recovery = RecoveryStore.empty_snapshot()
+        self.persist_recovery_snapshot(force=True)
+        return {"status": "success", "message": "Recovery candidates dismissed."}
+
+    def restore_recovery(self, data):
+        if not self._has_pending_recovery():
+            return {"status": "success", "message": "No pending recovery candidates.", "restored": {}}
+
+        data = data or {}
+        ongoing_ids = data.get("ongoing_task_ids", [])
+        queued_ids = data.get("queued_task_ids", [])
+        completed_ids = data.get("completed_task_ids", [])
+
+        restored = {
+            "ongoing_to_queue": [],
+            "queued": [],
+            "completed": [],
+            "failed": [],
+        }
+
+        tasks_to_queue = []
+        for task in RecoveryStore.select_tasks(self.pending_recovery, "ongoing", ongoing_ids):
+            task.reset()
+            task.runner_envar.pop("CUDA_VISIBLE_DEVICES", None)
+            tasks_to_queue.append(("ongoing_to_queue", task))
+
+        for task in RecoveryStore.select_tasks(self.pending_recovery, "queued", queued_ids):
+            task.reset()
+            task.runner_envar.pop("CUDA_VISIBLE_DEVICES", None)
+            tasks_to_queue.append(("queued", task))
+
+        for section, task in tasks_to_queue:
+            ok, message = self.add_task_to_queue(task, allow_partial=True)
+            if ok:
+                restored[section].append(task.task_id)
+            else:
+                restored["failed"].append({"task_id": task.task_id, "message": message})
+
+        completed_tasks = RecoveryStore.select_tasks(self.pending_recovery, "completed", completed_ids)
+        for task in completed_tasks:
+            if task.task_id in self.task_ongoing or task.task_id in [_t.task_id for _t in self.loader.get_queue()]:
+                restored["failed"].append({
+                    "task_id": task.task_id,
+                    "message": "A running or queued task already uses this task id.",
+                })
+                continue
+            self.add_task_to_history(task)
+            restored["completed"].append(task.task_id)
+
+        self.pending_recovery = RecoveryStore.empty_snapshot()
+        self.persist_recovery_snapshot(force=True)
+        return {"status": "success", "message": "Recovery applied.", "restored": restored}
+
     def _ADGS_check(self) -> None:
         """
         ADGS Detection Logic
@@ -74,21 +177,32 @@ class gpu_runner(base_runner):
         if not self.opt.get("ADGS_enabled", False):
             return
 
-        threshold_usage = self.opt.get("ADGS_thresh_usage", 0.5)
-        threshold_mem = self.opt.get("ADGS_mem_usage", 0.5)
+        threshold_usage = self.opt.get("ADGS_usage_threshold", 0.5)
+        threshold_mem = self.opt.get("ADGS_mem_threshold", 0.5)
+        stats = self.monitor.current_stats
+        gpu_memory = stats.get("gpu_memory", [])
+        gpu_total_memory = stats.get("gpu_total_memory", [])
 
-        for idx, hist in enumerate(self.system_stats["gpu_usage"]):
-            recent_usage = sum(hist[-20:]) / 20
+        for idx, hist in enumerate(stats.get("gpu_usage", [])):
+            if idx >= len(gpu_memory) or idx >= len(gpu_total_memory):
+                continue
+
+            recent_usage_values = hist[-20:]
+            if not recent_usage_values:
+                continue
+
+            recent_usage = sum(recent_usage_values) / len(recent_usage_values)
+            recent_mem_values = gpu_memory[idx][-20:]
             recent_mem = (
-                sum(self.system_stats["gpu_memory"][idx][-20:])
-                / 20
-                / self.system_stats["gpu_total_memory"][idx]
+                sum(recent_mem_values)
+                / max(len(recent_mem_values), 1)
+                / max(gpu_total_memory[idx], 1)
             )
             if recent_usage > threshold_usage or recent_mem > threshold_mem:
                 self.gpu_availability[idx] = 0
             else:
                 # only free if not in use by our tasks
-                if not any(idx in t["gpu_idx"] for t in self._ongoing_tasks):
+                if not any(idx in getattr(task, "gpu_idx", []) for task in self.task_ongoing.values()):
                     self.gpu_availability[idx] = 1
 
     def set_gpu_states(
@@ -120,7 +234,7 @@ class gpu_runner(base_runner):
             return
 
         if idx == "all":
-            var = [value] * len(var)
+            var[:] = [value] * len(var)
         else:
             for i in [idx] if isinstance(idx, int) else idx:
                 var[i] = value
@@ -204,6 +318,8 @@ class gpu_runner(base_runner):
             if all(success):
                 for _t in task_to_queue:
                     self.loader.append(entry=_t)
+
+        self.persist_recovery_snapshot()
                 
         return list(zip(success, message))
     
@@ -214,6 +330,15 @@ class gpu_runner(base_runner):
         success = []
         for task_id in task_ids:
             success.append(self.loader.remove(task_id=task_id))
+        self.persist_recovery_snapshot()
+        return success
+
+    @handle_singular_or_plural
+    def promote_task_in_queue(self, task_ids: List[AntTask | str]):
+        success = []
+        for task_id in task_ids:
+            success.append(self.loader.promote_to_front(task_id=task_id))
+        self.persist_recovery_snapshot()
         return success
 
     def modify_task_in_queue(
@@ -231,10 +356,14 @@ class gpu_runner(base_runner):
         for task in tasks:
             if task.task_id in self.task_id_history:
                 # if found, overwrite
-                self.task_completed[self.task_id_history.index(task.task_id)] = task
+                for idx, completed_task in enumerate(self.task_completed):
+                    if completed_task.task_id == task.task_id:
+                        self.task_completed[idx] = task
+                        break
             else:
                 self.task_id_history.add(task.task_id)
                 self.task_completed.append(task)
+        self.persist_recovery_snapshot()
     
     @handle_singular_or_plural
     def remove_task_from_history(self,
@@ -248,10 +377,11 @@ class gpu_runner(base_runner):
             self.task_id_history.remove(task_id)
             for _t in self.task_completed:
                 if _t.task_id == task_id:
-                    self.task_completed .remove(_t)
+                    self.task_completed.remove(_t)
                     break
             success.append(True)
             self.logger.info(f'Removed task {task_id} from task history. Please remember to backup your logs before starting new task with the same ID.')
+        self.persist_recovery_snapshot()
         return success
     
     def try_dispatch_task(self):
@@ -291,6 +421,7 @@ class gpu_runner(base_runner):
             self.logger.info(
                 f"Task {s_task.task_id} on GPU {list2str(gpu_ids)} started."
             )
+            self.persist_recovery_snapshot()
 
     def check_finished_task(self):
         # move finished task to self.task_completed
@@ -310,6 +441,8 @@ class gpu_runner(base_runner):
             self.logger.info(
                 f"Task {f_task.task_id} finished. Took {f_task.get_time(type='runtime', formatted=True)}"
             )
+        if task_id_status["completed_process"]:
+            self.persist_recovery_snapshot()
     
     @handle_singular_or_plural
     def kill_task(self, 
@@ -340,6 +473,7 @@ class gpu_runner(base_runner):
                 f"Task {task.task_id} Terminated. Took {task.get_time(type='runtime', formatted=True)}"
             )
             result.append(True)
+        self.persist_recovery_snapshot()
         return result
 
     def step(self):
@@ -398,6 +532,10 @@ class gpu_runner(base_runner):
             'terminal_win_height': self.opt.get('VISUALIZER_terminal_win_height', 20),
             'view_log_max_lines': self.opt.get('VISUALIZER_view_log_max_lines', 500),
             'completed_output_default_lines': self.opt.get('VISUALIZER_completed_output_default_lines', 50),
+            'ongoing_output_line_control_enabled': self.opt.get('VISUALIZER_ongoing_output_line_control_enabled', True),
+            'completed_output_line_control_enabled': self.opt.get('VISUALIZER_completed_output_line_control_enabled', True),
+            'output_min_lines': self.opt.get('VISUALIZER_output_min_lines', 2),
+            'output_max_lines': self.opt.get('VISUALIZER_output_max_lines', 12),
         }
 
         # monitors
@@ -649,7 +787,7 @@ class gpu_runner(base_runner):
 
             elif queue_mode == 'multi':
                 tasks = []
-                envar = data.get('envar', {})
+                envar = copy.deepcopy(data.get('envar', {}))
                 task_id = data.get('task_id', None)
             
                 # try parsing gpu_runner-specific args from envar
@@ -664,6 +802,7 @@ class gpu_runner(base_runner):
                     del envar['ant_n_gpus']
                 else:
                     n_gpus_from_envar = self.opt.get("RUNNER_default_n_gpus", 0)
+                base_envar = copy.deepcopy(envar)
             
                 for c in split_commands(data['command']):
                     # try parsing gpu_runner-specific args from cmd
@@ -671,7 +810,8 @@ class gpu_runner(base_runner):
 
                     # if args from cmd present, prioritize it.
                     n_gpus = n_gpus_from_envar if n_gpus_from_cmd is None else n_gpus_from_cmd
-                    envar.update(envar_from_cmd)
+                    task_envar = copy.deepcopy(base_envar)
+                    task_envar.update(envar_from_cmd)
 
                     # randomize uuid lmao
                     resolved_task_id = task_id_from_cmd or task_id_from_envar or task_id
@@ -684,7 +824,7 @@ class gpu_runner(base_runner):
                     tasks.append(AntTask(command=cleaned_c,
                                          task_id=resolved_task_id,
                                          n_gpus=n_gpus,
-                                         envar=envar))
+                                         envar=task_envar))
             else:
                 self.logger.error(f"queue_mode: '{queue_mode}' is not recognized. Expected value: 'single' / 'muilti'")
                 return {'status' : 'error', 

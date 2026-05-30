@@ -1,16 +1,22 @@
 import React, { useEffect, useState } from "react";
 import Layout, { useToast } from "../components/layout/layout";
+import LineCountControl from "../components/line_count_control";
 import { useMonitorData } from "../App";
 import illustration from "/img/chill_1.png";
 import TaskDetail from "../components/visualization/task_detail";
 import { copyCommand, terminateTask } from "../utils/taskActions";
 import {
   getStoredBoolean,
+  readStoredNumber,
   readBooleanMap,
+  writeStoredValue,
   writeBooleanMap,
 } from "../utils/persistedTaskState";
+import { clampLineCount, takeLastItems } from "../utils/lineCount";
+import { getOutputWindowLines } from "../utils/outputWindow";
 
 const ONGOING_DETAIL_STORAGE_KEY = "antScheduler.ongoingTask.detailExpanded";
+const ONGOING_OUTPUT_LINE_COUNT_STORAGE_KEY = "antScheduler.ongoingTask.outputLineCount";
 
 export default function OngoingTasks() {
   const { data } = useMonitorData();
@@ -19,12 +25,37 @@ export default function OngoingTasks() {
   const [expandedByTaskId, setExpandedByTaskId] = useState(() =>
     readBooleanMap(ONGOING_DETAIL_STORAGE_KEY)
   );
+  const [outputLineCount, setOutputLineCount] = useState(() =>
+    readStoredNumber(ONGOING_OUTPUT_LINE_COUNT_STORAGE_KEY, null)
+  );
+
+  const liveLineCap = clampLineCount(
+    data?.visualizer?.terminal_win_height ?? 20,
+    1,
+    5000,
+    20
+  );
+  const lineControlEnabled = data?.visualizer?.ongoing_output_line_control_enabled !== false;
+  const effectiveOutputLineCount = lineControlEnabled
+    ? clampLineCount(outputLineCount ?? liveLineCap, 1, liveLineCap, liveLineCap)
+    : liveLineCap;
+  const { minLines: outputMinLines, maxLines: outputMaxLines } = getOutputWindowLines(data?.visualizer);
 
   useEffect(() => {
     if (data?.task_ongoing) {
       setRunningTasks(data.task_ongoing);
     }
   }, [data]);
+
+  useEffect(() => {
+    if (outputLineCount === null) return;
+
+    const clamped = clampLineCount(outputLineCount, 1, liveLineCap, liveLineCap);
+    if (clamped !== outputLineCount) {
+      setOutputLineCount(clamped);
+      writeStoredValue(ONGOING_OUTPUT_LINE_COUNT_STORAGE_KEY, clamped);
+    }
+  }, [liveLineCap, outputLineCount]);
 
   const isTaskExpanded = (task, idx) =>
     getStoredBoolean(expandedByTaskId, task.task_id, idx === 0);
@@ -51,21 +82,39 @@ export default function OngoingTasks() {
     });
   };
 
+  const handleOutputLineCountChange = (nextValue) => {
+    const normalized = clampLineCount(nextValue, 1, liveLineCap, liveLineCap);
+    setOutputLineCount(normalized);
+    writeStoredValue(ONGOING_OUTPUT_LINE_COUNT_STORAGE_KEY, normalized);
+  };
+
   const pageActions = (
-    <button
-      type="button"
-      className="btn btn-outline-dark page-action-btn mb-0 d-flex align-items-center gap-1"
-      disabled={runningTasks.length === 0}
-      onClick={() => setAllDetailsExpanded(!allDetailsExpanded)}
-      title={allDetailsExpanded ? "Collapse All Tasks" : "Expand All Tasks"}
-    >
-      <i className="material-icons" style={{ fontSize: "16px" }}>
-        {allDetailsExpanded ? "unfold_less" : "unfold_more"}
-      </i>
-      <span className="text-xxs text-uppercase font-weight-bolder">
-        {allDetailsExpanded ? "Hide All" : "Show All"}
-      </span>
-    </button>
+    <>
+      {lineControlEnabled ? (
+        <LineCountControl
+          label="Live Lines"
+          value={effectiveOutputLineCount}
+          min={1}
+          max={liveLineCap}
+          disabled={runningTasks.length === 0}
+          onChange={handleOutputLineCountChange}
+        />
+      ) : null}
+      <button
+        type="button"
+        className="btn btn-outline-dark page-action-btn mb-0 d-flex align-items-center gap-1"
+        disabled={runningTasks.length === 0}
+        onClick={() => setAllDetailsExpanded(!allDetailsExpanded)}
+        title={allDetailsExpanded ? "Collapse All Tasks" : "Expand All Tasks"}
+      >
+        <i className="material-icons" style={{ fontSize: "16px" }}>
+          {allDetailsExpanded ? "unfold_less" : "unfold_more"}
+        </i>
+        <span className="text-xxs text-uppercase font-weight-bolder">
+          {allDetailsExpanded ? "Hide All" : "Show All"}
+        </span>
+      </button>
+    </>
   );
 
   return (
@@ -136,7 +185,9 @@ export default function OngoingTasks() {
                 )}
                 outputLabel="Live Output"
                 outputType="terminal"
-                outputContent={task.console_out.join("\n")}
+                outputContent={takeLastItems(task.console_out, effectiveOutputLineCount).join("\n")}
+                outputMinLines={outputMinLines}
+                outputMaxLines={outputMaxLines}
                 collapsible={true}
                 defaultExpanded={idx === 0}
                 expanded={isTaskExpanded(task, idx)}

@@ -12,6 +12,7 @@ import CompletedTask from "./pages/completed_task";
 import CreateTask from "./pages/create_task";
 import Logs from "./pages/logs";
 import NotFound from "./pages/404";
+import TaskRecoveryModal from "./components/recovery/task_recovery_modal";
 
 const DataContext = createContext(null);
 
@@ -67,6 +68,7 @@ function App() {
         <Route path="*" element={<Navigate to="/404" />} />
         <Route path="/404" element={<NotFound />} />
       </Routes>
+      <TaskRecoveryModal />
     </DataContext.Provider>
     </ToastProvider>
   );

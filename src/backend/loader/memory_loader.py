@@ -52,6 +52,16 @@ class memory_loader(base_loader):
         self.logger.info(f"Appending new entries to the command queue: {entry}")
         self.command_queue.extend([entry])
 
+    def promote_to_front(self, task_id: AntTask | str) -> bool:
+        task_id = task_id if isinstance(task_id, str) else task_id.task_id
+
+        for idx, entry in enumerate(self.command_queue):
+            if entry.task_id == task_id:
+                self.command_queue.insert(0, self.command_queue.pop(idx))
+                self.logger.info(f"Promoted task {task_id} to the front of the queue.")
+                return True
+        return False
+
     def get_queue(self) -> List[AntTask]:
         """Return the entire command queue."""
         return self.command_queue

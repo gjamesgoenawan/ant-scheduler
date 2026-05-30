@@ -6,6 +6,40 @@ import { useToast } from "../layout/layout";
 export default function QueuedTaskList({ queuedTasks }) {
   const { addToast } = useToast();
 
+  const runQueueAction = async ({ taskId, endpoint, successTitle, errorTitle }) => {
+    try {
+      const response = await fetch(`${API_URL}/${endpoint}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task_ids: taskId }),
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(errorTitle, errorText);
+        addToast({
+          type: "error",
+          title: errorTitle,
+          message: errorText || undefined,
+          delay: 2000,
+        });
+      } else {
+        addToast({
+          type: "info",
+          title: successTitle,
+          delay: 2000,
+        });
+      }
+    } catch (err) {
+      console.error(errorTitle, err);
+      addToast({
+        type: "error",
+        title: errorTitle,
+        message: String(err),
+        delay: 2000,
+      });
+    }
+  };
+
   return (
     <div className="queued-task-card dashboard-ops-panel">
       <div className="queued-task-card-header">
@@ -61,51 +95,41 @@ export default function QueuedTaskList({ queuedTasks }) {
                   </span>
                 </div>
 
-                <div className="ms-auto queued-task-actions">
+                <div className="ms-auto queued-task-actions d-flex flex-column align-items-center gap-1">
                   <button
                     className="btn btn-link p-2"
                     style={{ minWidth: "20px" }}
                     onClick={async () => {
-                      try {
-                        const response = await fetch(
-                          `${API_URL}/remove_task_from_queue`,
-                          {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ task_ids: task.task_id }),
-                          }
-                        );
-                        if (!response.ok) {
-                          const errorText = await response.text();
-                          console.error("Failed to remove task from queue", errorText);
-                          addToast({
-                            type: "error",
-                            title: `Task ${task.task_id} could not be removed`,
-                            message: errorText || undefined,
-                            delay: 2000,
-                          });
-                        } else {
-                          addToast({
-                            type: "info",
-                            title: `Task ${task.task_id} removed from queue`,
-                            delay: 2000,
-                          });
-                        }
-                      } catch (err) {
-                        console.error("Error removing task from queue:", err);
-                        addToast({
-                          type: "error",
-                          title: "Remove Failed",
-                          message: String(err),
-                          delay: 2000,
-                        });
-                      }
+                      await runQueueAction({
+                        taskId: task.task_id,
+                        endpoint: "remove_task_from_queue",
+                        successTitle: `Task ${task.task_id} removed from queue`,
+                        errorTitle: `Task ${task.task_id} could not be removed`,
+                      });
                     }}
+                    title="Delete Task"
                   >
                     <div className="d-flex justify-content-center align-items-center">
                       <i className="material-icons" style={{ color: "red" }}>
                         delete_outline
                       </i>
+                    </div>
+                  </button>
+                  <button
+                    className="btn btn-link p-2"
+                    style={{ minWidth: "20px" }}
+                    onClick={async () => {
+                      await runQueueAction({
+                        taskId: task.task_id,
+                        endpoint: "promote_task_in_queue",
+                        successTitle: `Task ${task.task_id} moved to top`,
+                        errorTitle: `Task ${task.task_id} could not be promoted`,
+                      });
+                    }}
+                    title="Move To Top"
+                  >
+                    <div className="d-flex justify-content-center align-items-center">
+                      <i className="material-icons text-dark">vertical_align_top</i>
                     </div>
                   </button>
                 </div>
