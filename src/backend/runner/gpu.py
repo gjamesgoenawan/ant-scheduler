@@ -10,7 +10,7 @@ from loader import base_loader
 from logger import base_logger
 from monitor import ThreadedMonitor
 from utils.misc import (handle_singular_or_plural, list2str,
-                        parse_and_truncate_file, split_commands,
+                        parse_and_truncate_file, read_last_n_lines, split_commands,
                         sanitize_task_id, increment_task_id,
                         render_task_id_template)
 from utils.structures import AntTask
@@ -394,6 +394,12 @@ class gpu_runner(base_runner):
             'completed': len(result['task_completed']),
         }
 
+        result['visualizer'] = {
+            'terminal_win_height': self.opt.get('VISUALIZER_terminal_win_height', 20),
+            'view_log_max_lines': self.opt.get('VISUALIZER_view_log_max_lines', 500),
+            'completed_output_default_lines': self.opt.get('VISUALIZER_completed_output_default_lines', 50),
+        }
+
         # monitors
         result['monitor'] = self.monitor.current_stats
         result['monitor']['gpu_allowed'] = self.gpu_allowed
@@ -457,7 +463,8 @@ class gpu_runner(base_runner):
 
     def get_log(self,
                 task_id: str,
-                full_log: bool = False) -> Tuple[bool, str]:
+                full_log: bool = False,
+                tail_lines: Optional[int] = None) -> Tuple[bool, str]:
         task = None
         if task_id in self.task_ongoing:
             task = self.task_ongoing[task_id]
@@ -483,6 +490,11 @@ class gpu_runner(base_runner):
             if full_log:
                 with open(filename) as f:
                     rendered_file = f.read()
+            elif tail_lines is not None:
+                rendered_lines = read_last_n_lines(filename, tail_lines)
+                rendered_file = '\n'.join(rendered_lines)
+                if rendered_file:
+                    rendered_file += '\n'
             else:
                 rendered_file = parse_and_truncate_file(
                     filename=filename,

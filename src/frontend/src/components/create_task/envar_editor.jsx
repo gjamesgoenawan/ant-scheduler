@@ -6,6 +6,7 @@ import React, {
   useImperativeHandle,
 } from "react";
 import { API_URL } from "../../App";
+import TaskIdTemplateHelp from "./task_id_template_help";
 
 const ENV_VAR_PRESETS = [
   { key: "ant_task_id", value: '"[uuid]"', label: "ant_task_id", defaultLabel: "[uuid]" },
@@ -316,6 +317,13 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
             />
           </div>
         </div>
+      </div>
+
+      <div className="mt-3">
+        <TaskIdTemplateHelp
+          compact={true}
+          storageKey="antScheduler.createTask.envTaskIdTemplateHelpExpanded"
+        />
       </div>
 
       <div className="">

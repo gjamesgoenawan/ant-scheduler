@@ -28,5 +28,6 @@
     "VISUALIZER_log_max_height": 20,
     "VISUALIZER_log_max_width": "inf",
     "VISUALIZER_terminal_win_height": 20,
-    "VISUALIZER_view_log_max_lines": 500
+    "VISUALIZER_completed_output_default_lines": 50,
+    "VISUALIZER_view_log_max_lines": 200
 }

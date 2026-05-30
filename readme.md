@@ -43,6 +43,78 @@ By default, this will load the configuration from `config/default.json` and host
 curl --insecure https://0.0.0.0:6060/api/
 ```
 
+### Configuration Reference
+ANT reads its runtime settings from `config/default.json`. The shipped file controls three different layers at once: the process layout, the scheduler/runtime behaviour, and the UI/logging defaults.
+
+Current sample config:
+
+```json
+{
+  "backend_port": 5000,
+  "frontend_port": 6060,
+  "step_interval": 1,
+  "logger": "default_logger",
+  "loader": "memory_loader",
+  "handler": "subprocess_handler",
+  "runner": "gpu_runner",
+  "visualizer": "flask_visualizer",
+  "RUNNER_default_n_gpus": 0,
+  "LOGGER_log_dir": "./ant_runner_logs",
+  "LOGGER_log_to_file": true,
+  "LOGGER_log_to_stdout": true,
+  "LOGGER_level": 0,
+  "ADGS_enabled": false,
+  "ADGS_usage_threshold": 0.5,
+  "ADGS_mem_threshold": 0.5,
+  "MONITORING_history_size": 300,
+  "MONITORING_refresh_interval": 1,
+  "MONITORING_smoother_alpha": 0.1,
+  "HANDLER_pipe_to_file": true,
+  "VISUALIZER_log_max_height": 20,
+  "VISUALIZER_log_max_width": "inf",
+  "VISUALIZER_terminal_win_height": 50,
+  "VISUALIZER_completed_output_default_lines": 50,
+  "VISUALIZER_view_log_max_lines": 200
+}
+```
+
+Field-by-field explanation:
+
+| Key | Meaning | Practical effect |
+| - | - | - |
+| `backend_port` | HTTP port used by the Flask/Eventlet backend API. | The frontend proxy forwards `/api/*` requests to this port. Change this if port `5000` is occupied. |
+| `frontend_port` | HTTPS port used by the Quart/Hypercorn frontend server. | This is the browser entrypoint you open, typically `https://host:6060`. |
+| `step_interval` | Main scheduler loop interval in seconds. | Controls how often ANT advances the scheduler, refreshes live status, and emits UI updates. Lower values feel more real-time but cost more CPU. |
+| `logger` | Logger backend implementation name. | Usually left as `default_logger` unless you are extending ANT internals. |
+| `loader` | Loader implementation name. | `memory_loader` keeps queue/env state in memory instead of a database or external store. |
+| `handler` | Process execution backend. | `subprocess_handler` means tasks are launched as local subprocesses. |
+| `runner` | Scheduler implementation. | `gpu_runner` is the core GPU-aware scheduler that validates requests and dispatches jobs. |
+| `visualizer` | Web/API visualization backend. | `flask_visualizer` is the backend that powers `/vis`, `/get_log`, socket updates, and the React UI. |
+| `RUNNER_default_n_gpus` | Fallback GPU count when a task does not explicitly request one. | Applies when neither the form nor `ant_n_gpus` nor inline command args specify GPU count. `0` means CPU-only by default. |
+| `LOGGER_log_dir` | Root directory for ANT-managed log files. | Every task log is created under this folder, grouped by timestamped subdirectory. |
+| `LOGGER_log_to_file` | Whether ANT writes task output to files. | Keep this `true` if you want the Completed/Logs pages and download actions to work reliably. |
+| `LOGGER_log_to_stdout` | Whether ANT also mirrors task logs to ANT's own stdout. | Useful when supervising ANT from tmux/systemd and wanting aggregated console output. |
+| `LOGGER_level` | Internal logger verbosity. | Higher verbosity can help debug scheduler issues but also increases console noise. |
+| `ADGS_enabled` | Enables Auto Detect GPU Status. | When enabled, ANT will try to detect GPUs that are busy because of processes not launched by ANT itself. |
+| `ADGS_usage_threshold` | GPU utilization threshold for ADGS. | If external usage stays above this fraction, ANT will mark the GPU as unavailable. |
+| `ADGS_mem_threshold` | GPU memory utilization threshold for ADGS. | Similar to usage threshold, but based on memory pressure. |
+| `MONITORING_history_size` | Number of monitoring samples kept in memory. | Larger values give longer graphs/history on the dashboard but consume more memory. |
+| `MONITORING_refresh_interval` | Hardware sampling interval in seconds. | Lower values update the dashboard more frequently but cost more polling overhead. |
+| `MONITORING_smoother_alpha` | Smoothing factor for monitoring plots. | Lower values smooth graphs more aggressively; higher values react faster to spikes. |
+| `HANDLER_pipe_to_file` | Whether subprocess output is piped into ANT log files. | Should usually stay `true`; disabling it reduces log capture fidelity. |
+| `VISUALIZER_log_max_height` | Legacy/default log height hint. | Mostly affects older visualization assumptions; modern React pages rely more on CSS and the newer line-count settings. |
+| `VISUALIZER_log_max_width` | Legacy/default log width hint. | Usually safe to leave as `"inf"`; rarely changed in the current UI. |
+| `VISUALIZER_terminal_win_height` | Number of live lines the backend keeps for ongoing-task terminal snapshots. | This is the effective live-output window for the Ongoing Tasks page. Raising it increases socket payload size every scheduler tick. |
+| `VISUALIZER_completed_output_default_lines` | Default number of lines shown in Completed Tasks Output panels. | The page-level `Output Lines` slider starts from this value, but users can adjust it per browser and the choice is remembered locally. |
+| `VISUALIZER_view_log_max_lines` | Maximum number of lines ANT will serve for truncated log views. | Caps Completed Task output previews and non-full log fetches. Raising it increases response size and frontend render cost. |
+
+Recommended tuning notes:
+
+- If Completed Tasks feels heavy, lower `VISUALIZER_view_log_max_lines` first. That directly limits how much text the browser can request and render per task preview.
+- If live updates feel heavy, lower `VISUALIZER_terminal_win_height`. This reduces the number of terminal lines sent to every connected browser on each `/vis` update.
+- `VISUALIZER_completed_output_default_lines` only changes the initial Completed preview window; it is a UX default, not the hard cap.
+- Changing `backend_port` or `frontend_port` usually requires restarting ANT so both child processes pick up the new values.
+
 ### Test Run 
 Head over to the `Create New Task` tab and type the following in the `commands` box:
 ```

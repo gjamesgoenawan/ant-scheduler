@@ -127,11 +127,22 @@ def create_task():
 def get_log():
     task_id = request.args.get("task_id")  # get from query string
     full_log_arg = request.args.get("full_log", "false")
+    tail_lines_arg = request.args.get("tail_lines")
     if not task_id:
         return jsonify({"status": "error", "message": "task_id is required"}), 400
 
     full_log = str(full_log_arg).strip().lower() in {"1", "true", "yes", "on"}
-    success, logs = r.get_log(task_id, full_log=full_log)
+    tail_lines = None
+    if tail_lines_arg not in {None, ""}:
+        try:
+            tail_lines = int(tail_lines_arg)
+        except (TypeError, ValueError):
+            return jsonify({"status": "error", "message": "tail_lines must be an integer"}), 400
+
+        if tail_lines < 1:
+            return jsonify({"status": "error", "message": "tail_lines must be >= 1"}), 400
+
+    success, logs = r.get_log(task_id, full_log=full_log, tail_lines=tail_lines)
     
     if success:
         return jsonify({"status": "success", "data": logs}), 200

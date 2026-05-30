@@ -11,8 +11,20 @@ function parseLogResponseBody(rawText) {
   }
 }
 
-export async function fetchLogContent(taskId) {
-  const response = await fetch(`${API_URL}/get_log?task_id=${encodeURIComponent(taskId)}`);
+export async function fetchLogContent(taskId, options = {}) {
+  const params = new URLSearchParams({
+    task_id: taskId,
+  });
+
+  if (options.fullLog) {
+    params.set("full_log", "true");
+  }
+
+  if (options.tailLines) {
+    params.set("tail_lines", String(options.tailLines));
+  }
+
+  const response = await fetch(`${API_URL}/get_log?${params.toString()}`);
   const rawText = await response.text();
   const payload = parseLogResponseBody(rawText);
 

@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Layout, { useToast } from "../components/layout/layout";
+import LineCountControl from "../components/line_count_control";
 import { useMonitorData } from "../App";
 import {
   bulkDeleteTasks,
@@ -12,13 +13,19 @@ import {
 } from "../utils/taskActions";
 import {
   getStoredBoolean,
+  readStoredNumber,
   readBooleanMap,
+  writeStoredValue,
   writeBooleanMap,
 } from "../utils/persistedTaskState";
 import { fetchLogContent } from "../utils/logFetch";
+import { clampLineCount, takeLastLinesFromText } from "../utils/lineCount";
 
 const COMPLETED_DETAIL_STORAGE_KEY = "antScheduler.completedTasks.detailExpanded";
 const COMPLETED_OUTPUT_STORAGE_KEY = "antScheduler.completedTasks.outputExpanded";
+const COMPLETED_OUTPUT_LINE_COUNT_STORAGE_KEY = "antScheduler.completedTasks.outputLineCount";
+const COMPLETED_OUTPUT_FETCH_CHUNK = 50;
+const completedTaskOutputCache = new Map();
 
 const TaskRow = ({
   task,
@@ -34,25 +41,61 @@ const TaskRow = ({
   onRestart,
   onDelete,
   onDownload,
+  outputLineCount,
+  outputFetchLineCount,
 }) => {
-  const [outputContent, setOutputContent] = useState("");
+  const initialCacheEntry = completedTaskOutputCache.get(task.task_id);
+  const [outputContent, setOutputContent] = useState(initialCacheEntry?.content || "");
   const [outputLoading, setOutputLoading] = useState(false);
   const [outputError, setOutputError] = useState(null);
+  const [loadedOutputLineCount, setLoadedOutputLineCount] = useState(
+    initialCacheEntry?.fetchedLineCount || 0
+  );
+  const outputShellRef = useRef(null);
 
   useEffect(() => {
     if (!isExpanded || !isOutputExpanded) return;
+
+    const cachedEntry = completedTaskOutputCache.get(task.task_id);
+    if (cachedEntry?.content) {
+      if (cachedEntry.content !== outputContent) {
+        setOutputContent(cachedEntry.content);
+      }
+      if (cachedEntry.fetchedLineCount !== loadedOutputLineCount) {
+        setLoadedOutputLineCount(cachedEntry.fetchedLineCount);
+      }
+      setOutputError(null);
+    }
+
+    if (cachedEntry?.content && cachedEntry.fetchedLineCount >= outputFetchLineCount) {
+      return;
+    }
 
     let cancelled = false;
     setOutputLoading(true);
     setOutputError(null);
 
-    fetchLogContent(task.task_id)
+    fetchLogContent(task.task_id, { tailLines: outputFetchLineCount })
       .then((content) => {
         if (cancelled) return;
+        completedTaskOutputCache.set(task.task_id, {
+          content,
+          fetchedLineCount: outputFetchLineCount,
+        });
         setOutputContent(content);
+        setLoadedOutputLineCount(outputFetchLineCount);
       })
       .catch((error) => {
         if (cancelled) return;
+
+        const staleCacheEntry = completedTaskOutputCache.get(task.task_id);
+        if (staleCacheEntry?.content) {
+          setOutputContent(staleCacheEntry.content);
+          setLoadedOutputLineCount(staleCacheEntry.fetchedLineCount);
+          setOutputError(null);
+          return;
+        }
+
         setOutputError(String(error.message || error));
       })
       .finally(() => {
@@ -63,7 +106,20 @@ const TaskRow = ({
     return () => {
       cancelled = true;
     };
-  }, [task.task_id, isExpanded, isOutputExpanded]);
+  }, [task.task_id, isExpanded, isOutputExpanded, outputFetchLineCount, outputContent, loadedOutputLineCount]);
+
+  const displayedOutput = outputError
+    ? outputError
+    : takeLastLinesFromText(outputContent, outputLineCount);
+
+  useEffect(() => {
+    if (!isExpanded || !isOutputExpanded) return;
+
+    const ref = outputShellRef.current;
+    if (!ref) return;
+
+    ref.scrollTop = ref.scrollHeight;
+  }, [displayedOutput, isExpanded, isOutputExpanded, outputLoading]);
 
   const statusSquare = (
     <div
@@ -253,7 +309,10 @@ const TaskRow = ({
 
             <div className="col-12 mt-2 completed-task-output-row">
               <div className="completed-task-output-header d-flex align-items-center justify-content-between gap-2 mb-2">
-                <span className="text-xs font-weight-bold text-secondary text-uppercase">Output</span>
+                <div className="d-flex flex-column">
+                  <span className="text-xs font-weight-bold text-secondary text-uppercase">Output</span>
+                  <span className="completed-task-output-meta">Last {outputLineCount} lines</span>
+                </div>
                 <button
                   type="button"
                   className="btn btn-link text-dark p-1 mb-0 d-flex align-items-center gap-1"
@@ -273,11 +332,11 @@ const TaskRow = ({
               </div>
 
               {isOutputExpanded ? (
-                <div className="bg-black text-light p-3 rounded completed-task-output-shell">
+                <div className="bg-black text-light p-3 rounded completed-task-output-shell" ref={outputShellRef}>
                   <pre className="completed-task-output-pre">
                     {outputLoading && !outputContent
                       ? "Loading output..."
-                      : outputError || outputContent || "Failed to load Log."}
+                      : displayedOutput || "Failed to load Log."}
                   </pre>
                 </div>
               ) : null}
@@ -302,12 +361,46 @@ export default function CompletedTasks() {
   const [outputExpandedByTaskId, setOutputExpandedByTaskId] = useState(() =>
     readBooleanMap(COMPLETED_OUTPUT_STORAGE_KEY)
   );
+  const [outputLineCount, setOutputLineCount] = useState(() =>
+    readStoredNumber(COMPLETED_OUTPUT_LINE_COUNT_STORAGE_KEY, null)
+  );
+
+  const outputLineCap = clampLineCount(data?.visualizer?.view_log_max_lines ?? 500, 1, 5000, 500);
+  const defaultOutputLineCount = clampLineCount(
+    data?.visualizer?.completed_output_default_lines ?? 50,
+    1,
+    outputLineCap,
+    50
+  );
+  const effectiveOutputLineCount = clampLineCount(
+    outputLineCount ?? defaultOutputLineCount,
+    1,
+    outputLineCap,
+    defaultOutputLineCount
+  );
+  const outputFetchLineCount = Math.min(
+    outputLineCap,
+    Math.max(
+      COMPLETED_OUTPUT_FETCH_CHUNK,
+      Math.ceil(effectiveOutputLineCount / COMPLETED_OUTPUT_FETCH_CHUNK) * COMPLETED_OUTPUT_FETCH_CHUNK
+    )
+  );
 
   useEffect(() => {
     if (data?.task_completed) {
       setCompletedTasks(data.task_completed);
     }
   }, [data]);
+
+  useEffect(() => {
+    if (outputLineCount === null) return;
+
+    const clamped = clampLineCount(outputLineCount, 1, outputLineCap, defaultOutputLineCount);
+    if (clamped !== outputLineCount) {
+      setOutputLineCount(clamped);
+      writeStoredValue(COMPLETED_OUTPUT_LINE_COUNT_STORAGE_KEY, clamped);
+    }
+  }, [defaultOutputLineCount, outputLineCap]);
 
   useEffect(() => {
     setSelectedTaskIds((current) =>
@@ -396,8 +489,22 @@ export default function CompletedTasks() {
   const allOutputsExpanded =
     completedTasks.length > 0 && completedTasks.every((task) => isTaskOutputExpanded(task));
 
+  const handleOutputLineCountChange = (nextValue) => {
+    const normalized = clampLineCount(nextValue, 1, outputLineCap, defaultOutputLineCount);
+    setOutputLineCount(normalized);
+    writeStoredValue(COMPLETED_OUTPUT_LINE_COUNT_STORAGE_KEY, normalized);
+  };
+
   const pageActions = (
     <>
+      <LineCountControl
+        label="Output Lines"
+        value={effectiveOutputLineCount}
+        min={1}
+        max={outputLineCap}
+        disabled={completedTasks.length === 0}
+        onChange={handleOutputLineCountChange}
+      />
       <button
         type="button"
         className="btn btn-outline-dark page-action-btn mb-0 d-flex align-items-center gap-1"
@@ -575,6 +682,8 @@ export default function CompletedTasks() {
                       onRestart={(task) => restartTask(task.task_id, addToast)}
                       onDownload={(task) => downloadLog(task.task_id, addToast)}
                       onDelete={(task) => deleteTask(task.task_id, addToast)}
+                          outputLineCount={effectiveOutputLineCount}
+                        outputFetchLineCount={outputFetchLineCount}
                   />
                   ))
               )}
