@@ -18409,15 +18409,15 @@ Icon colors
   }
 
   .task-detail-command-row {
-    margin-top: 0.2rem !important;
+    margin-top: 0.12rem !important;
   }
 
   .task-detail-command-row .mb-2 {
-    margin-bottom: 0.35rem !important;
+    margin-bottom: 0.32rem !important;
   }
 
   .task-detail-command {
-    padding: 0.75rem;
+    padding: 0.42rem 0.55rem;
   }
 
   .task-detail-output-shell {
@@ -18453,14 +18453,6 @@ Icon colors
   .completed-task-expanded-panel .col-md-3,
   .completed-task-expanded-panel .col-6 {
     margin-bottom: 0.35rem !important;
-  }
-
-  .completed-task-command-row {
-    margin-top: 0.08rem !important;
-  }
-
-  .completed-task-command-shell {
-    padding: 0.65rem !important;
   }
 
   .completed-task-output-header {
@@ -19731,13 +19723,15 @@ Icon colors
     display: block;
     word-break: break-word;
     white-space: pre-wrap;
+    font-size: 0.76rem;
+    line-height: 1.32;
   }
 
   .task-detail-command {
     width: 100%;
-    padding: 0.95rem;
+    padding: 0.42rem 0.55rem;
     border: 1px solid #edf2f7;
-    border-radius: 0.75rem;
+    border-radius: 0.58rem;
     background: #fff;
   }
 
@@ -20355,13 +20349,13 @@ Icon colors
     }
 
     .task-detail-command-row {
-      margin-top: 0.75rem !important;
-      padding-top: 0.5rem;
+      margin-top: 0.45rem !important;
+      padding-top: 0.35rem;
     }
 
     .task-detail-command {
       width: 100%;
-      padding: 0.75rem !important;
+      padding: 0.42rem 0.55rem !important;
     }
 
     .task-detail-output-shell {

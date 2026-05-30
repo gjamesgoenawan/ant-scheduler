@@ -302,10 +302,10 @@ const TaskRow = ({
               </p>
             </div>
              
-            <div className="col-12 mt-1 completed-task-command-row">
-              <span className="text-xs font-weight-bold text-secondary text-uppercase">Command</span>
-              <div className="p-2 border rounded bg-white mt-1 completed-task-command-shell">
-                <code className="text-dark" style={{ wordBreak: "break-all" }}>{task.command}</code>
+            <div className="col-12 mt-1 task-detail-command-row">
+              <div className="text-xs font-weight-bold text-secondary text-uppercase mb-2">Command</div>
+              <div className="task-detail-command">
+                <code className="text-dark task-detail-command-text" style={{ wordBreak: "break-all" }}>{task.command}</code>
               </div>
             </div>
 
