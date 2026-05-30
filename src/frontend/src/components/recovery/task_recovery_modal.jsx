@@ -168,8 +168,8 @@ export default function TaskRecoveryModal() {
   const [deletingKey, setDeletingKey] = useState(null);
   const [error, setError] = useState(null);
 
-  const loadRecoveryState = async () => {
-    const response = await fetch(`${API_URL}/recovery_state`);
+  const loadRecoveryState = async ({ consumePrompt = false } = {}) => {
+    const response = await fetch(`${API_URL}/recovery_state?consume_prompt=${consumePrompt ? "true" : "false"}`);
     if (!response.ok) {
       throw new Error(await response.text());
     }
@@ -180,7 +180,7 @@ export default function TaskRecoveryModal() {
   useEffect(() => {
     let cancelled = false;
 
-    loadRecoveryState()
+    loadRecoveryState({ consumePrompt: true })
       .then((recoveryPayload) => {
         if (cancelled) return;
         setRecovery(recoveryPayload);
@@ -278,7 +278,7 @@ export default function TaskRecoveryModal() {
       });
       if (!response.ok) throw new Error(await response.text());
       setSelectedKeys((current) => current.filter((selectedKey) => selectedKey !== key));
-      const nextRecovery = await loadRecoveryState();
+      const nextRecovery = await loadRecoveryState({ consumePrompt: false });
       setRecovery(nextRecovery);
       addToast({ type: "info", title: `Removed ${task.task_id} from recovery`, delay: 2000 });
     } catch (deleteError) {

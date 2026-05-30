@@ -43,6 +43,7 @@ class gpu_runner(base_runner):
         self.recovery_store = RecoveryStore(self.opt)
         loaded_recovery = self.recovery_store.load() if self.recovery_enabled else RecoveryStore.empty_history()
         self.pending_recovery = loaded_recovery if RecoveryStore.has_tasks(loaded_recovery) else RecoveryStore.empty_history()
+        self.recovery_prompt_consumed = False
 
         # Initialize GPU monitoring
         self.monitor = ThreadedMonitor(opt)
@@ -119,15 +120,22 @@ class gpu_runner(base_runner):
             "completed": [cls._format_recovery_task(task, "completed", session_id) for task in session.get("completed", [])],
         }
 
-    def get_recovery_state(self):
+    def get_recovery_state(self, consume_prompt: bool = True):
         history = RecoveryStore.normalize_history(self.pending_recovery)
         sessions = history.get("sessions", [])
         formatted_sessions = [self._format_recovery_session(session) for session in sessions]
         last_session = formatted_sessions[0] if formatted_sessions else None
         earlier_sessions = formatted_sessions[1:]
+        has_pending = self._has_pending_recovery()
+        should_prompt = has_pending
+        if consume_prompt:
+            should_prompt = has_pending and not self.recovery_prompt_consumed
+            if should_prompt:
+                self.recovery_prompt_consumed = True
 
         return {
-            "pending": self._has_pending_recovery(),
+            "pending": should_prompt,
+            "has_history": has_pending,
             "last_session": last_session,
             "earlier_sessions": earlier_sessions,
             "session_count": len(formatted_sessions),
@@ -138,6 +146,7 @@ class gpu_runner(base_runner):
         }
 
     def dismiss_recovery(self):
+        self.recovery_prompt_consumed = True
         return {"status": "success", "message": "Recovery candidates kept for later."}
 
     def _entries_from_recovery_request(self, data):
@@ -198,6 +207,7 @@ class gpu_runner(base_runner):
             entries_to_remove.append(entry)
 
         self.pending_recovery = RecoveryStore.remove_entries(self.pending_recovery, entries_to_remove)
+        self.recovery_prompt_consumed = True
         self.persist_recovery_snapshot(force=True)
         return {"status": "success", "message": "Recovery applied.", "restored": restored}
 
@@ -207,6 +217,8 @@ class gpu_runner(base_runner):
             return {"status": "success", "message": "No recovery tasks selected for deletion."}
 
         self.pending_recovery = RecoveryStore.remove_entries(self.pending_recovery, entries)
+        if not self._has_pending_recovery():
+            self.recovery_prompt_consumed = True
         self.persist_recovery_snapshot(force=True)
         return {"status": "success", "message": "Recovery tasks removed from history."}
 

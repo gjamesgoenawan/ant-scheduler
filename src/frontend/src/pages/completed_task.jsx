@@ -311,9 +311,10 @@ const TaskRow = ({
 
             <div className="col-12 mt-2 completed-task-output-row">
               <div className="completed-task-output-header d-flex align-items-center justify-content-between gap-2 mb-2">
-                <div className="d-flex flex-column">
-                  <span className="text-xs font-weight-bold text-secondary text-uppercase">Output</span>
-                  <span className="completed-task-output-meta">Last {outputLineCount} lines</span>
+                <div className="d-flex align-items-center min-width-0">
+                  <span className="text-xxs font-weight-bolder text-secondary text-uppercase opacity-7 completed-task-output-title">
+                    Output (Last {outputLineCount} lines)
+                  </span>
                 </div>
                 <button
                   type="button"

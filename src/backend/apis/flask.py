@@ -123,7 +123,8 @@ def vis():
 
 @app.route("/recovery_state", methods=["GET"])
 def recovery_state():
-    return safe_runner_call(r.get_recovery_state)
+    consume_prompt = str(request.args.get("consume_prompt", "true")).strip().lower() not in {"0", "false", "no", "off"}
+    return safe_runner_call(r.get_recovery_state, consume_prompt)
 
 @app.route("/restore_recovery", methods=["POST"])
 def restore_recovery():

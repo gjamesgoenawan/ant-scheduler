@@ -116,8 +116,8 @@ Field-by-field explanation:
 | `VISUALIZER_ongoing_output_line_control_enabled` | Shows or hides the Ongoing Tasks `Live Lines` slider and number input. | When enabled, each browser remembers its chosen live-line count in local storage. When disabled, the page uses `VISUALIZER_terminal_win_height`. |
 | `VISUALIZER_completed_output_line_control_enabled` | Shows or hides the Completed Tasks `Output Lines` slider and number input. | When enabled, each browser remembers its chosen completed-output line count in local storage. When disabled, the page uses `VISUALIZER_completed_output_default_lines`. |
 | `VISUALIZER_completed_output_default_lines` | Default number of lines shown in Completed Tasks Output panels. | The page-level `Output Lines` slider starts from this value, but users can adjust it per browser and the choice is remembered locally. |
-| `VISUALIZER_output_min_lines` | Minimum visible height of Ongoing/Completed output panels, measured in terminal lines. | Defaults to `2`, so small outputs no longer reserve a large blank terminal area. |
-| `VISUALIZER_output_max_lines` | Maximum visible height of Ongoing/Completed output panels before scrolling, measured in terminal lines. | Defaults to `12`; output beyond this height scrolls inside the panel and auto-scrolls to the latest line. |
+| `VISUALIZER_output_min_lines` | Minimum visible height of Ongoing/Completed output panels, measured in terminal lines. | Defaults to `1`, so small outputs no longer reserve a large blank terminal area. |
+| `VISUALIZER_output_max_lines` | Maximum visible height of Ongoing/Completed output panels before scrolling, measured in terminal lines. | Defaults to `20`; output beyond this height scrolls inside the panel and auto-scrolls to the latest line. |
 | `VISUALIZER_view_log_max_lines` | Maximum number of lines ANT will serve for truncated log views. | Caps Completed Task output previews and non-full log fetches. Raising it increases response size and frontend render cost. |
 
 Recommended tuning notes:
@@ -139,7 +139,7 @@ Intuitively, you can view all ongoing and completed tasks in their respectives t
 
 ### Task Recovery after `run.py` interruption
 
-When `RECOVERY_enabled` is `true`, ANT continuously snapshots task metadata to `RECOVERY_state_file`. If `run.py` is interrupted or the backend exits while work is queued/running, the next browser session opens a recovery dialog.
+When `RECOVERY_enabled` is `true`, ANT snapshots task metadata to `RECOVERY_state_file`. If `run.py` is interrupted or the backend exits while work is queued/running, the next browser session opens a recovery dialog once for that ANT backend startup. Refreshing the browser after the first prompt will not reopen the dialog until ANT is restarted again.
 
 The recovery dialog has two tabs:
 
@@ -156,7 +156,9 @@ The dialog separates candidates into three groups:
 
 The bottom action row provides one-click select/unselect buttons for Interrupted Ongoing Tasks, Queued Tasks, and Completed Tasks in the active tab.
 
-The recovery file is written through a temporary file and atomic rename, with `fsync` on the file and parent directory. This makes recovery useful even after sudden power loss, up to the last successfully flushed snapshot. It cannot reattach to a process that died with the machine; interrupted running tasks are requeued and should be safe to rerun from the command level.
+By default, the recovery file is `./ant_runner_logs/ant_recovery_state.json` relative to the directory where ANT is launched. You can change this path with `RECOVERY_state_file` in `config/default.json`. It is a JSON file, so you can inspect, copy, back it up, or move it while ANT is stopped. If you edit it manually, keep valid JSON and preserve the `sessions` structure.
+
+The recovery file is written through a temporary file and atomic rename, with `fsync` on the file and parent directory. Flushes are event-driven: ANT writes when queue/history/running state changes, such as task creation, queue removal or promotion, dispatch start, completion, termination, recovery restore/delete, and backend shutdown. It does not flush every dashboard refresh. This makes recovery useful even after sudden power loss, up to the last successfully flushed snapshot. It cannot reattach to a process that died with the machine; interrupted running tasks are requeued and should be safe to rerun from the command level.
 
 Task lists can grow over time because completed-history recovery is intentionally conservative. Practical ways to keep the list manageable are: delete recovery items that you know are obsolete, keep task ids descriptive so old sessions are easy to scan, and keep `LOGGER_log_dir` on persistent storage so restored completed entries still point to usable logs.
 

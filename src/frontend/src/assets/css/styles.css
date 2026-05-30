@@ -18180,7 +18180,7 @@ Icon colors
 
   .task-detail-title {
     font-size: 1.05rem;
-    line-height: 1.35;
+    line-height: 1.18;
     word-break: break-word;
     overflow-wrap: anywhere;
   }
@@ -18194,7 +18194,7 @@ Icon colors
 
   .task-detail-header {
     margin-top: 0.2rem;
-    margin-bottom: 1.6rem;
+    margin-bottom: 0.85rem;
   }
 
   .task-detail-copy {
@@ -18392,24 +18392,24 @@ Icon colors
   }
 
   .task-detail-summary {
-    padding: 0.85rem !important;
+    padding: 0.68rem 0.78rem !important;
   }
 
   .task-detail-summary.mb-4 {
-    margin-bottom: 0.85rem !important;
+    margin-bottom: 0.65rem !important;
   }
 
   .task-detail-summary .col-md-3,
   .task-detail-summary .col-6 {
-    margin-bottom: 0.55rem !important;
+    margin-bottom: 0.35rem !important;
   }
 
   .task-detail-summary .mt-1 {
-    margin-top: 0.15rem !important;
+    margin-top: 0.08rem !important;
   }
 
   .task-detail-command-row {
-    margin-top: 0.35rem !important;
+    margin-top: 0.2rem !important;
   }
 
   .task-detail-command-row .mb-2 {
@@ -18442,12 +18442,21 @@ Icon colors
   }
 
   .completed-task-expanded-panel {
-    margin-top: 0.6rem !important;
-    padding: 0.75rem !important;
+    margin-top: 0.45rem !important;
+    padding: 0.62rem 0.72rem !important;
   }
 
   .completed-task-expanded-panel .row {
-    row-gap: 0.2rem;
+    row-gap: 0.1rem;
+  }
+
+  .completed-task-expanded-panel .col-md-3,
+  .completed-task-expanded-panel .col-6 {
+    margin-bottom: 0.35rem !important;
+  }
+
+  .completed-task-command-row {
+    margin-top: 0.08rem !important;
   }
 
   .completed-task-command-shell {
@@ -18457,6 +18466,10 @@ Icon colors
   .completed-task-output-header {
     min-height: 28px;
     margin-bottom: 0.35rem !important;
+  }
+
+  .completed-task-output-title {
+    line-height: 1.2;
   }
 
   .completed-task-output-shell {

@@ -183,7 +183,7 @@ export default function OngoingTasks() {
                     </button>
                   </>
                 )}
-                outputLabel="Live Output"
+                outputLabel={`Live Output (Last ${effectiveOutputLineCount} lines)`}
                 outputType="terminal"
                 outputContent={takeLastItems(task.console_out, effectiveOutputLineCount).join("\n")}
                 outputMinLines={outputMinLines}
