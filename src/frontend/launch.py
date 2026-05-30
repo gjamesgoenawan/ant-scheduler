@@ -181,6 +181,18 @@ async def notfound():
 async def catch_all(path):
     return redirect("/404")
 
+def suppress_ssl_shutdown_timeout(loop, context):
+    exception = context.get("exception")
+    if isinstance(exception, TimeoutError) and "SSL shutdown timed out" in str(exception):
+        logger.debug("Suppressed benign SSL shutdown timeout from a closed client connection.")
+        return
+    loop.default_exception_handler(context)
+
+async def run_frontend_server(config):
+    loop = asyncio.get_running_loop()
+    loop.set_exception_handler(suppress_ssl_shutdown_timeout)
+    await serve(app, config)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Start ANT frontend")
     parser.add_argument("--config", type=str, default="config/default.json", help="JSON config for ANT")
@@ -201,4 +213,4 @@ if __name__ == "__main__":
 
     print(f"Running frontend at https://0.0.0.0:{opt['frontend_port']}")
     
-    asyncio.run(serve(app, config))
+    asyncio.run(run_frontend_server(config))

@@ -18499,6 +18499,45 @@ Icon colors
     border-bottom: 1px solid rgba(226, 232, 240, 0.9);
   }
 
+  .task-recovery-tabs,
+  .task-recovery-bulk-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    padding: 0.75rem 1.2rem;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+    background: #f8fafc;
+  }
+
+  .task-recovery-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 34px;
+    padding: 0.35rem 0.8rem;
+    border: 1px solid rgba(203, 213, 225, 0.95);
+    border-radius: 0.65rem;
+    background: #fff;
+    color: #475569;
+    font-size: 0.78rem;
+    font-weight: 800;
+  }
+
+  .task-recovery-tab span {
+    min-width: 1.45rem;
+    padding: 0.08rem 0.35rem;
+    border-radius: 999px;
+    background: rgba(226, 232, 240, 0.95);
+    color: #334155;
+    text-align: center;
+  }
+
+  .task-recovery-tab-active {
+    border-color: #111827;
+    color: #111827;
+  }
+
   .task-recovery-footer {
     justify-content: flex-end;
     border-top: 1px solid rgba(226, 232, 240, 0.9);
@@ -18520,6 +18559,35 @@ Icon colors
   .task-recovery-body {
     overflow: auto;
     padding: 1rem 1.2rem;
+  }
+
+  .task-recovery-session + .task-recovery-session {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed rgba(203, 213, 225, 0.95);
+  }
+
+  .task-recovery-session-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.65rem;
+    color: #64748b;
+    font-size: 0.78rem;
+  }
+
+  .task-recovery-session-count {
+    font-weight: 800;
+  }
+
+  .task-recovery-empty {
+    padding: 1.5rem;
+    border: 1px dashed rgba(203, 213, 225, 0.95);
+    border-radius: 0.75rem;
+    color: #64748b;
+    text-align: center;
+    font-size: 0.85rem;
   }
 
   .task-recovery-section + .task-recovery-section {
@@ -18549,19 +18617,43 @@ Icon colors
     border: 1px solid rgba(226, 232, 240, 0.95);
     border-radius: 0.75rem;
     background: #f8fafc;
-    cursor: pointer;
   }
 
-  .task-recovery-checkbox {
-    margin-top: 0.12rem;
+  .task-recovery-check-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     flex: 0 0 auto;
+    width: 30px;
+    height: 30px;
+    margin-top: -0.1rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #334155;
+  }
+
+  .task-recovery-check-icon {
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  .task-recovery-check-button[aria-pressed="true"] {
+    color: #111827;
+  }
+
+  .task-recovery-delete-button {
+    flex: 0 0 auto;
+    align-self: center;
   }
 
   .task-recovery-item-body {
+    flex: 1 1 auto;
     min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+    cursor: pointer;
   }
 
   .task-recovery-item-top {
@@ -18597,6 +18689,19 @@ Icon colors
     font-family: var(--bs-font-monospace);
     font-size: 0.76rem;
     overflow-wrap: anywhere;
+  }
+
+  .task-recovery-bulk-actions {
+    justify-content: flex-start;
+    border-top: 1px solid rgba(226, 232, 240, 0.9);
+  }
+
+  .task-recovery-bulk-actions .btn {
+    min-height: 32px;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
   }
 
   .completed-task-output-pre {

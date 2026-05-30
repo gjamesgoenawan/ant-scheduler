@@ -41,8 +41,8 @@ class gpu_runner(base_runner):
         self.loader = loader
         self.recovery_enabled = self.opt.get("RECOVERY_enabled", True)
         self.recovery_store = RecoveryStore(self.opt)
-        loaded_recovery = self.recovery_store.load() if self.recovery_enabled else RecoveryStore.empty_snapshot()
-        self.pending_recovery = loaded_recovery if RecoveryStore.has_tasks(loaded_recovery) else RecoveryStore.empty_snapshot()
+        loaded_recovery = self.recovery_store.load() if self.recovery_enabled else RecoveryStore.empty_history()
+        self.pending_recovery = loaded_recovery if RecoveryStore.has_tasks(loaded_recovery) else RecoveryStore.empty_history()
 
         # Initialize GPU monitoring
         self.monitor = ThreadedMonitor(opt)
@@ -78,16 +78,15 @@ class gpu_runner(base_runner):
     def persist_recovery_snapshot(self, force: bool = False):
         if not self.recovery_enabled:
             return
-        if self._has_pending_recovery() and not force:
-            return
         self.recovery_store.write(
             queued=self.loader.get_queue(),
             ongoing=self.task_ongoing.values(),
             completed=self.task_completed,
+            carried_history=self.pending_recovery if self._has_pending_recovery() else None,
         )
 
     @staticmethod
-    def _format_recovery_task(task_state, section):
+    def _format_recovery_task(task_state, section, session_id):
         task = AntTask.from_state_dict(task_state)
         if section == "completed":
             status = "Terminated" if task.terminated else "Completed"
@@ -97,6 +96,9 @@ class gpu_runner(base_runner):
             status = "Queued"
 
         return {
+            "session_id": session_id,
+            "section": section,
+            "recovery_key": f"{session_id}:{section}:{task.task_id}",
             "task_id": task.task_id,
             "status": status,
             "start_time": task.get_time(type="start", formatted=True) or "-",
@@ -106,29 +108,53 @@ class gpu_runner(base_runner):
             "envar": task.envar,
         }
 
+    @classmethod
+    def _format_recovery_session(cls, session):
+        session_id = session.get("session_id")
+        return {
+            "session_id": session_id,
+            "saved_at": session.get("saved_at"),
+            "ongoing": [cls._format_recovery_task(task, "ongoing", session_id) for task in session.get("ongoing", [])],
+            "queued": [cls._format_recovery_task(task, "queued", session_id) for task in session.get("queued", [])],
+            "completed": [cls._format_recovery_task(task, "completed", session_id) for task in session.get("completed", [])],
+        }
+
     def get_recovery_state(self):
-        snapshot = self.pending_recovery
+        history = RecoveryStore.normalize_history(self.pending_recovery)
+        sessions = history.get("sessions", [])
+        formatted_sessions = [self._format_recovery_session(session) for session in sessions]
+        last_session = formatted_sessions[0] if formatted_sessions else None
+        earlier_sessions = formatted_sessions[1:]
+
         return {
             "pending": self._has_pending_recovery(),
-            "saved_at": snapshot.get("saved_at"),
-            "ongoing": [self._format_recovery_task(task, "ongoing") for task in snapshot.get("ongoing", [])],
-            "queued": [self._format_recovery_task(task, "queued") for task in snapshot.get("queued", [])],
-            "completed": [self._format_recovery_task(task, "completed") for task in snapshot.get("completed", [])],
+            "last_session": last_session,
+            "earlier_sessions": earlier_sessions,
+            "session_count": len(formatted_sessions),
+            "saved_at": last_session.get("saved_at") if last_session else None,
+            "ongoing": last_session.get("ongoing", []) if last_session else [],
+            "queued": last_session.get("queued", []) if last_session else [],
+            "completed": last_session.get("completed", []) if last_session else [],
         }
 
     def dismiss_recovery(self):
-        self.pending_recovery = RecoveryStore.empty_snapshot()
-        self.persist_recovery_snapshot(force=True)
-        return {"status": "success", "message": "Recovery candidates dismissed."}
+        return {"status": "success", "message": "Recovery candidates kept for later."}
+
+    def _entries_from_recovery_request(self, data):
+        data = data or {}
+        entries = RecoveryStore.normalize_entries(data.get("entries", []))
+        if entries:
+            return entries
+
+        legacy_entries = []
+        legacy_entries.extend(RecoveryStore.entries_from_legacy_selection(self.pending_recovery, "ongoing", data.get("ongoing_task_ids", [])))
+        legacy_entries.extend(RecoveryStore.entries_from_legacy_selection(self.pending_recovery, "queued", data.get("queued_task_ids", [])))
+        legacy_entries.extend(RecoveryStore.entries_from_legacy_selection(self.pending_recovery, "completed", data.get("completed_task_ids", [])))
+        return legacy_entries
 
     def restore_recovery(self, data):
         if not self._has_pending_recovery():
             return {"status": "success", "message": "No pending recovery candidates.", "restored": {}}
-
-        data = data or {}
-        ongoing_ids = data.get("ongoing_task_ids", [])
-        queued_ids = data.get("queued_task_ids", [])
-        completed_ids = data.get("completed_task_ids", [])
 
         restored = {
             "ongoing_to_queue": [],
@@ -136,27 +162,31 @@ class gpu_runner(base_runner):
             "completed": [],
             "failed": [],
         }
+        entries_to_remove = []
 
         tasks_to_queue = []
-        for task in RecoveryStore.select_tasks(self.pending_recovery, "ongoing", ongoing_ids):
+        completed_tasks = []
+        selected_entries = self._entries_from_recovery_request(data)
+        for entry, task in RecoveryStore.select_entries(self.pending_recovery, selected_entries):
+            section = entry["section"]
+            if section == "completed":
+                completed_tasks.append((entry, task))
+                continue
+
             task.reset()
             task.runner_envar.pop("CUDA_VISIBLE_DEVICES", None)
-            tasks_to_queue.append(("ongoing_to_queue", task))
+            restore_section = "ongoing_to_queue" if section == "ongoing" else "queued"
+            tasks_to_queue.append((entry, restore_section, task))
 
-        for task in RecoveryStore.select_tasks(self.pending_recovery, "queued", queued_ids):
-            task.reset()
-            task.runner_envar.pop("CUDA_VISIBLE_DEVICES", None)
-            tasks_to_queue.append(("queued", task))
-
-        for section, task in tasks_to_queue:
+        for entry, section, task in tasks_to_queue:
             ok, message = self.add_task_to_queue(task, allow_partial=True)
             if ok:
                 restored[section].append(task.task_id)
+                entries_to_remove.append(entry)
             else:
                 restored["failed"].append({"task_id": task.task_id, "message": message})
 
-        completed_tasks = RecoveryStore.select_tasks(self.pending_recovery, "completed", completed_ids)
-        for task in completed_tasks:
+        for entry, task in completed_tasks:
             if task.task_id in self.task_ongoing or task.task_id in [_t.task_id for _t in self.loader.get_queue()]:
                 restored["failed"].append({
                     "task_id": task.task_id,
@@ -165,10 +195,20 @@ class gpu_runner(base_runner):
                 continue
             self.add_task_to_history(task)
             restored["completed"].append(task.task_id)
+            entries_to_remove.append(entry)
 
-        self.pending_recovery = RecoveryStore.empty_snapshot()
+        self.pending_recovery = RecoveryStore.remove_entries(self.pending_recovery, entries_to_remove)
         self.persist_recovery_snapshot(force=True)
         return {"status": "success", "message": "Recovery applied.", "restored": restored}
+
+    def delete_recovery_tasks(self, data):
+        entries = self._entries_from_recovery_request(data)
+        if not entries:
+            return {"status": "success", "message": "No recovery tasks selected for deletion."}
+
+        self.pending_recovery = RecoveryStore.remove_entries(self.pending_recovery, entries)
+        self.persist_recovery_snapshot(force=True)
+        return {"status": "success", "message": "Recovery tasks removed from history."}
 
     def _ADGS_check(self) -> None:
         """

@@ -78,8 +78,8 @@ Current sample config:
   "VISUALIZER_ongoing_output_line_control_enabled": true,
   "VISUALIZER_completed_output_line_control_enabled": true,
   "VISUALIZER_completed_output_default_lines": 50,
-  "VISUALIZER_output_min_lines": 2,
-  "VISUALIZER_output_max_lines": 12,
+  "VISUALIZER_output_min_lines": 1,
+  "VISUALIZER_output_max_lines": 10,
   "VISUALIZER_view_log_max_lines": 200
 }
 ```
@@ -141,13 +141,24 @@ Intuitively, you can view all ongoing and completed tasks in their respectives t
 
 When `RECOVERY_enabled` is `true`, ANT continuously snapshots task metadata to `RECOVERY_state_file`. If `run.py` is interrupted or the backend exits while work is queued/running, the next browser session opens a recovery dialog.
 
+The recovery dialog has two tabs:
+
+- Last Session: tasks from the most recent saved scheduler session.
+- Earlier Sessions: unresolved tasks from older sessions that were not restored yet.
+
+If you close the dialog or restore only part of a session, unselected tasks stay in recovery history and will remain available on later starts. To intentionally forget a task, click the delete button on the right side of that task item. Deletion is permanent for recovery history, but it does not remove any existing log file.
+
 The dialog separates candidates into three groups:
 
 - Interrupted Ongoing Tasks: tasks that were running when the backend disappeared. On normal `SIGTERM`/`Ctrl+C` shutdown, ANT saves the recovery snapshot and terminates worker subprocesses before exit. ANT cannot reattach to old subprocesses after restart, so selected tasks are added back to the queue with the same task id and command.
 - Queued Tasks: tasks that were waiting in the in-memory queue. Selected tasks are added back to the queue.
 - Completed Tasks: completed-history entries from the snapshot. Selected tasks are restored to the Completed Tasks page, including their saved log-file paths when the logs still exist.
 
-After you click `Restore Selected` or `Dismiss`, ANT rewrites the snapshot with the current scheduler state. If you dismiss recovery, the old candidates are intentionally cleared.
+The bottom action row provides one-click select/unselect buttons for Interrupted Ongoing Tasks, Queued Tasks, and Completed Tasks in the active tab.
+
+The recovery file is written through a temporary file and atomic rename, with `fsync` on the file and parent directory. This makes recovery useful even after sudden power loss, up to the last successfully flushed snapshot. It cannot reattach to a process that died with the machine; interrupted running tasks are requeued and should be safe to rerun from the command level.
+
+Task lists can grow over time because completed-history recovery is intentionally conservative. Practical ways to keep the list manageable are: delete recovery items that you know are obsolete, keep task ids descriptive so old sessions are easy to scan, and keep `LOGGER_log_dir` on persistent storage so restored completed entries still point to usable logs.
 
 ### Queue ordering
 

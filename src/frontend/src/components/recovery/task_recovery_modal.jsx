@@ -2,22 +2,73 @@ import React, { useEffect, useMemo, useState } from "react";
 import { API_URL } from "../../App";
 import { useToast } from "../layout/layout";
 
-const emptySelection = {
-  ongoing_task_ids: [],
-  queued_task_ids: [],
-  completed_task_ids: [],
+const SECTION_LABELS = {
+  ongoing: "Interrupted Ongoing Tasks",
+  queued: "Queued Tasks",
+  completed: "Completed Tasks",
 };
 
-function allTaskIds(tasks = []) {
-  return tasks.map((task) => task.task_id);
-}
+const SHORT_SECTION_LABELS = {
+  ongoing: "Interrupted",
+  queued: "Queued",
+  completed: "Completed",
+};
 
 function recoveryTime(savedAt) {
   if (!savedAt) return "-";
   return new Date(savedAt * 1000).toLocaleString();
 }
 
-function RecoverySection({ title, tasks, selectedIds, onToggle }) {
+function countSessionTasks(session) {
+  if (!session) return 0;
+  return ["ongoing", "queued", "completed"].reduce(
+    (total, section) => total + (session[section]?.length || 0),
+    0
+  );
+}
+
+function normalizeRecoveryPayload(payload) {
+  if (!payload) return payload;
+  if (payload.last_session !== undefined || payload.earlier_sessions !== undefined) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    last_session: {
+      session_id: "legacy-session",
+      saved_at: payload.saved_at,
+      ongoing: payload.ongoing || [],
+      queued: payload.queued || [],
+      completed: payload.completed || [],
+    },
+    earlier_sessions: [],
+  };
+}
+
+function taskKey(task) {
+  return task.recovery_key || `${task.session_id}:${task.section}:${task.task_id}`;
+}
+
+function taskEntry(task) {
+  return {
+    session_id: task.session_id,
+    section: task.section,
+    task_id: task.task_id,
+  };
+}
+
+function sessionTasks(session, section) {
+  return session?.[section] || [];
+}
+
+function sessionsForTab(recovery, activeTab) {
+  if (!recovery) return [];
+  if (activeTab === "last") return recovery.last_session ? [recovery.last_session] : [];
+  return recovery.earlier_sessions || [];
+}
+
+function RecoverySection({ title, tasks, selectedKeys, onToggle, onDelete, deletingKey }) {
   if (!tasks?.length) return null;
 
   return (
@@ -25,16 +76,23 @@ function RecoverySection({ title, tasks, selectedIds, onToggle }) {
       <div className="task-recovery-section-title">{title}</div>
       <div className="task-recovery-list">
         {tasks.map((task) => {
-          const checked = selectedIds.includes(task.task_id);
+          const key = taskKey(task);
+          const checked = selectedKeys.includes(key);
+          const isDeleting = deletingKey === key;
+
           return (
-            <label className="task-recovery-item" key={`${title}-${task.task_id}`}>
-              <input
-                type="checkbox"
-                className="form-check-input task-recovery-checkbox"
-                checked={checked}
-                onChange={() => onToggle(task.task_id)}
-              />
-              <span className="task-recovery-item-body">
+            <div className="task-recovery-item" key={key}>
+              <button
+                type="button"
+                className="task-recovery-check-button"
+                aria-pressed={checked}
+                onClick={() => onToggle(task)}
+              >
+                <i className="material-icons task-recovery-check-icon">
+                  {checked ? "check_box" : "check_box_outline_blank"}
+                </i>
+              </button>
+              <span className="task-recovery-item-body" onClick={() => onToggle(task)}>
                 <span className="task-recovery-item-top">
                   <span className="task-recovery-task-id">{task.task_id}</span>
                   <span className="task-recovery-status">{task.status}</span>
@@ -44,7 +102,16 @@ function RecoverySection({ title, tasks, selectedIds, onToggle }) {
                 </span>
                 <span className="task-recovery-command">{task.command}</span>
               </span>
-            </label>
+              <button
+                type="button"
+                className="btn btn-link text-danger p-2 mb-0 task-recovery-delete-button"
+                title="Delete From Recovery History"
+                disabled={isDeleting}
+                onClick={() => onDelete(task)}
+              >
+                <i className="material-icons text-lg">delete_outline</i>
+              </button>
+            </div>
           );
         })}
       </div>
@@ -52,35 +119,71 @@ function RecoverySection({ title, tasks, selectedIds, onToggle }) {
   );
 }
 
+function RecoverySession({ session, selectedKeys, onToggle, onDelete, deletingKey, showHeader }) {
+  if (!session || countSessionTasks(session) === 0) return null;
+
+  return (
+    <div className="task-recovery-session">
+      {showHeader ? (
+        <div className="task-recovery-session-header">
+          <span className="task-recovery-session-time">{recoveryTime(session.saved_at)}</span>
+          <span className="task-recovery-session-count">{countSessionTasks(session)} tasks</span>
+        </div>
+      ) : null}
+      <RecoverySection
+        title={SECTION_LABELS.ongoing}
+        tasks={sessionTasks(session, "ongoing")}
+        selectedKeys={selectedKeys}
+        onToggle={onToggle}
+        onDelete={onDelete}
+        deletingKey={deletingKey}
+      />
+      <RecoverySection
+        title={SECTION_LABELS.queued}
+        tasks={sessionTasks(session, "queued")}
+        selectedKeys={selectedKeys}
+        onToggle={onToggle}
+        onDelete={onDelete}
+        deletingKey={deletingKey}
+      />
+      <RecoverySection
+        title={SECTION_LABELS.completed}
+        tasks={sessionTasks(session, "completed")}
+        selectedKeys={selectedKeys}
+        onToggle={onToggle}
+        onDelete={onDelete}
+        deletingKey={deletingKey}
+      />
+    </div>
+  );
+}
+
 export default function TaskRecoveryModal() {
   const { addToast } = useToast();
   const [recovery, setRecovery] = useState(null);
-  const [selection, setSelection] = useState(emptySelection);
+  const [selectedKeys, setSelectedKeys] = useState([]);
+  const [activeTab, setActiveTab] = useState("last");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingKey, setDeletingKey] = useState(null);
   const [error, setError] = useState(null);
+
+  const loadRecoveryState = async () => {
+    const response = await fetch(`${API_URL}/recovery_state`);
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+    const payload = await response.json();
+    return normalizeRecoveryPayload(payload?.data || payload);
+  };
 
   useEffect(() => {
     let cancelled = false;
 
-    fetch(`${API_URL}/recovery_state`)
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(await response.text());
-        }
-        return response.json();
-      })
-      .then((payload) => {
+    loadRecoveryState()
+      .then((recoveryPayload) => {
         if (cancelled) return;
-        const recoveryPayload = payload?.data || payload;
         setRecovery(recoveryPayload);
-        if (recoveryPayload?.pending) {
-          setSelection({
-            ongoing_task_ids: allTaskIds(recoveryPayload.ongoing),
-            queued_task_ids: allTaskIds(recoveryPayload.queued),
-            completed_task_ids: allTaskIds(recoveryPayload.completed),
-          });
-        }
       })
       .catch((fetchError) => {
         if (cancelled) return;
@@ -95,32 +198,93 @@ export default function TaskRecoveryModal() {
     };
   }, []);
 
-  const hasSelection = useMemo(
-    () => Object.values(selection).some((ids) => ids.length > 0),
-    [selection]
+  const activeSessions = useMemo(
+    () => sessionsForTab(recovery, activeTab),
+    [recovery, activeTab]
   );
 
-  const toggleSelection = (key, taskId) => {
-    setSelection((current) => {
-      const selectedIds = current[key] || [];
-      const nextIds = selectedIds.includes(taskId)
-        ? selectedIds.filter((id) => id !== taskId)
-        : [...selectedIds, taskId];
-      return { ...current, [key]: nextIds };
+  const activeTabTasks = useMemo(
+    () => activeSessions.flatMap((session) => [
+      ...sessionTasks(session, "ongoing"),
+      ...sessionTasks(session, "queued"),
+      ...sessionTasks(session, "completed"),
+    ]),
+    [activeSessions]
+  );
+
+  const selectedEntries = useMemo(() => {
+    const byKey = new Map();
+    const allSessions = [recovery?.last_session, ...(recovery?.earlier_sessions || [])].filter(Boolean);
+    allSessions.forEach((session) => {
+      ["ongoing", "queued", "completed"].forEach((section) => {
+        sessionTasks(session, section).forEach((task) => byKey.set(taskKey(task), taskEntry(task)));
+      });
+    });
+    return selectedKeys.map((key) => byKey.get(key)).filter(Boolean);
+  }, [recovery, selectedKeys]);
+
+  const hasSelection = selectedEntries.length > 0;
+
+  const toggleTask = (task) => {
+    const key = taskKey(task);
+    setSelectedKeys((current) =>
+      current.includes(key)
+        ? current.filter((selectedKey) => selectedKey !== key)
+        : [...current, key]
+    );
+  };
+
+  const toggleSection = (section) => {
+    const sectionKeys = activeSessions.flatMap((session) => sessionTasks(session, section).map(taskKey));
+    if (sectionKeys.length === 0) return;
+
+    const allSelected = sectionKeys.every((key) => selectedKeys.includes(key));
+    setSelectedKeys((current) => {
+      if (allSelected) {
+        return current.filter((key) => !sectionKeys.includes(key));
+      }
+      return Array.from(new Set([...current, ...sectionKeys]));
     });
   };
 
-  const dismissRecovery = async () => {
+  const sectionButtonLabel = (section) => {
+    const sectionKeys = activeSessions.flatMap((session) => sessionTasks(session, section).map(taskKey));
+    if (sectionKeys.length === 0) return SHORT_SECTION_LABELS[section];
+    const allSelected = sectionKeys.every((key) => selectedKeys.includes(key));
+    return `${allSelected ? "Unselect" : "Select"} ${SHORT_SECTION_LABELS[section]}`;
+  };
+
+  const closeRecovery = async () => {
     setSubmitting(true);
     try {
-      const response = await fetch(`${API_URL}/dismiss_recovery`, { method: "POST" });
-      if (!response.ok) throw new Error(await response.text());
+      await fetch(`${API_URL}/dismiss_recovery`, { method: "POST" });
       setRecovery(null);
-      addToast({ type: "info", title: "Recovery dismissed", delay: 2000 });
+      addToast({ type: "info", title: "Recovery kept for later", delay: 2000 });
     } catch (dismissError) {
       setError(String(dismissError.message || dismissError));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const deleteRecoveryTask = async (task) => {
+    const key = taskKey(task);
+    setDeletingKey(key);
+    try {
+      const response = await fetch(`${API_URL}/delete_recovery_tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [taskEntry(task)] }),
+      });
+      if (!response.ok) throw new Error(await response.text());
+      setSelectedKeys((current) => current.filter((selectedKey) => selectedKey !== key));
+      const nextRecovery = await loadRecoveryState();
+      setRecovery(nextRecovery);
+      addToast({ type: "info", title: `Removed ${task.task_id} from recovery`, delay: 2000 });
+    } catch (deleteError) {
+      setError(String(deleteError.message || deleteError));
+    } finally {
+      setDeletingKey(null);
     }
   };
 
@@ -130,7 +294,7 @@ export default function TaskRecoveryModal() {
       const response = await fetch(`${API_URL}/restore_recovery`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(selection),
+        body: JSON.stringify({ entries: selectedEntries }),
       });
       if (!response.ok) throw new Error(await response.text());
       setRecovery(null);
@@ -144,6 +308,12 @@ export default function TaskRecoveryModal() {
 
   if (loading || !recovery?.pending) return null;
 
+  const lastCount = countSessionTasks(recovery.last_session);
+  const earlierCount = (recovery.earlier_sessions || []).reduce(
+    (total, session) => total + countSessionTasks(session),
+    0
+  );
+
   return (
     <div className="task-recovery-backdrop" role="dialog" aria-modal="true">
       <div className="task-recovery-modal">
@@ -152,30 +322,58 @@ export default function TaskRecoveryModal() {
             <div className="dashboard-panel-eyebrow">Recovery</div>
             <h5 className="task-recovery-title mb-0">Restore Tasks</h5>
           </div>
-          <span className="task-recovery-saved-at">{recoveryTime(recovery.saved_at)}</span>
+          <span className="task-recovery-saved-at">
+            {recoveryTime(recovery.last_session?.saved_at)}
+          </span>
         </div>
 
-        {error ? <div className="alert alert-danger py-2 mb-3">{error}</div> : null}
+        <div className="task-recovery-tabs" role="tablist">
+          <button
+            type="button"
+            className={`task-recovery-tab ${activeTab === "last" ? "task-recovery-tab-active" : ""}`}
+            onClick={() => setActiveTab("last")}
+          >
+            Last Session <span>{lastCount}</span>
+          </button>
+          <button
+            type="button"
+            className={`task-recovery-tab ${activeTab === "earlier" ? "task-recovery-tab-active" : ""}`}
+            onClick={() => setActiveTab("earlier")}
+          >
+            Earlier Sessions <span>{earlierCount}</span>
+          </button>
+        </div>
+
+        {error ? <div className="alert alert-danger py-2 mx-3 mt-3 mb-0">{error}</div> : null}
 
         <div className="task-recovery-body">
-          <RecoverySection
-            title="Interrupted Ongoing Tasks"
-            tasks={recovery.ongoing}
-            selectedIds={selection.ongoing_task_ids}
-            onToggle={(taskId) => toggleSelection("ongoing_task_ids", taskId)}
-          />
-          <RecoverySection
-            title="Queued Tasks"
-            tasks={recovery.queued}
-            selectedIds={selection.queued_task_ids}
-            onToggle={(taskId) => toggleSelection("queued_task_ids", taskId)}
-          />
-          <RecoverySection
-            title="Completed Tasks"
-            tasks={recovery.completed}
-            selectedIds={selection.completed_task_ids}
-            onToggle={(taskId) => toggleSelection("completed_task_ids", taskId)}
-          />
+          {activeTabTasks.length === 0 ? (
+            <div className="task-recovery-empty">No recovery tasks in this tab.</div>
+          ) : (
+            activeSessions.map((session) => (
+              <RecoverySession
+                key={session.session_id}
+                session={session}
+                selectedKeys={selectedKeys}
+                onToggle={toggleTask}
+                onDelete={deleteRecoveryTask}
+                deletingKey={deletingKey}
+                showHeader={activeTab === "earlier" || activeSessions.length > 1}
+              />
+            ))
+          )}
+        </div>
+
+        <div className="task-recovery-bulk-actions">
+          <button type="button" className="btn btn-outline-dark mb-0" onClick={() => toggleSection("ongoing")}>
+            {sectionButtonLabel("ongoing")}
+          </button>
+          <button type="button" className="btn btn-outline-dark mb-0" onClick={() => toggleSection("queued")}>
+            {sectionButtonLabel("queued")}
+          </button>
+          <button type="button" className="btn btn-outline-dark mb-0" onClick={() => toggleSection("completed")}>
+            {sectionButtonLabel("completed")}
+          </button>
         </div>
 
         <div className="task-recovery-footer">
@@ -183,9 +381,9 @@ export default function TaskRecoveryModal() {
             type="button"
             className="btn btn-outline-secondary mb-0"
             disabled={submitting}
-            onClick={dismissRecovery}
+            onClick={closeRecovery}
           >
-            Dismiss
+            Close
           </button>
           <button
             type="button"

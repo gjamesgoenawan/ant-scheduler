@@ -134,6 +134,11 @@ def restore_recovery():
 def dismiss_recovery():
     return safe_runner_call(r.dismiss_recovery)
 
+@app.route("/delete_recovery_tasks", methods=["POST"])
+def delete_recovery_tasks():
+    data = request.get_json(force=True)
+    return safe_runner_call(r.delete_recovery_tasks, data)
+
 @app.route("/toggle_allowed_gpu", methods=["POST"])
 def toggle_allowed_gpu():
     data = request.get_json(force=True)
