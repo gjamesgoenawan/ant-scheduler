@@ -18716,8 +18716,8 @@ Icon colors
     white-space: pre;
     color: inherit;
     font-family: var(--bs-font-monospace);
-    font-size: 13px;
-    line-height: 1.42;
+    font-size: 0.76rem;
+    line-height: 1.32;
     font-weight: 400;
   }
 
@@ -19752,8 +19752,8 @@ Icon colors
     min-width: max-content;
     color: inherit;
     font-family: var(--bs-font-monospace);
-    font-size: 14px;
-    line-height: 1.5;
+    font-size: 0.76rem;
+    line-height: 1.32;
     font-weight: 400;
   }
 
@@ -20367,11 +20367,6 @@ Icon colors
       border-radius: 0 !important;
     }
 
-    .task-detail-output-pre {
-      font-size: 12px;
-      line-height: 1.4;
-    }
-
     .completed-task-row {
       padding: 0.95rem 0 !important;
     }
@@ -20492,8 +20487,4 @@ Icon colors
       margin-left: 0 !important;
     }
 
-    .task-detail-output-pre {
-      font-size: 12px;
-      line-height: 1.4;
-    }
   }
