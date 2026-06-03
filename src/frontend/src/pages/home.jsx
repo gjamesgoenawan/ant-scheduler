@@ -39,6 +39,11 @@ function latestMetricValue(series, fallback = 0) {
   return Number.isFinite(value) ? value : fallback;
 }
 
+function formatOneDecimal(value, fallback = 0) {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue.toFixed(1) : Number(fallback).toFixed(1);
+}
+
 function clampPercent(value) {
   return Math.max(0, Math.min(100, value));
 }
@@ -124,7 +129,7 @@ function externalChartTooltipHandler(context) {
         <div class="dashboard-chart-tooltip-row">
           <span class="dashboard-chart-tooltip-swatch" style="background:${color};"></span>
           <span class="dashboard-chart-tooltip-label">${point.dataset.label}</span>
-          <span class="dashboard-chart-tooltip-value">${point.formattedValue}</span>
+          <span class="dashboard-chart-tooltip-value">${formatOneDecimal(point.parsed?.y ?? point.raw)}</span>
         </div>
       `;
     })
@@ -206,6 +211,7 @@ function buildLineChartOptions({ min = 0, max, title }) {
           display: true,
           color: CHART_TICK_COLOR,
           padding: 5,
+          callback: (value) => formatOneDecimal(value),
           font: {
             size: 12,
             weight: 400,
@@ -645,13 +651,13 @@ export default function Home() {
               <div className="dashboard-mobile-metrics dashboard-mobile-metrics-grid">
                 <MobileMetricBar
                   label="CPU Usage"
-                  valueText={`${cpuUsage.toFixed(1)}%`}
+                  valueText={`${formatOneDecimal(cpuUsage)}%`}
                   percent={cpuUsage}
                   tone="primary"
                 />
                 <MobileMetricBar
                   label="RAM Usage"
-                  valueText={`${ramUsagePercent.toFixed(0)}%`}
+                  valueText={`${formatOneDecimal(ramUsagePercent)}%`}
                   percent={ramTotal > 0 ? (ramUsage / ramTotal) * 100 : 0}
                   tone="info"
                 />
@@ -687,7 +693,7 @@ export default function Home() {
                       <MobileMetricBar
                         key={`gpu-usage-${gpu.index}`}
                         label={`gpu ${gpu.index} (${gpu.name})`}
-                        valueText={`${gpu.gpuUsage.toFixed(1)}%`}
+                        valueText={`${formatOneDecimal(gpu.gpuUsage)}%`}
                         percent={gpu.usagePercent}
                         tone="secondary"
                       />
@@ -705,7 +711,7 @@ export default function Home() {
                       <MobileMetricBar
                         key={`gpu-memory-${gpu.index}`}
                         label={`gpu ${gpu.index} (${gpu.name})`}
-                        valueText={`${gpu.gpuMemory.toFixed(1)} / ${gpu.gpuMemoryTotal} GB`}
+                        valueText={`${formatOneDecimal(gpu.gpuMemory)} / ${formatOneDecimal(gpu.gpuMemoryTotal)} GB`}
                         percent={gpu.memoryPercent}
                         tone="warning"
                       />
@@ -726,7 +732,7 @@ export default function Home() {
             <div className="dashboard-overview-card dashboard-overview-card-compute">
               <div className="dashboard-overview-copy">
                 <div className="dashboard-overview-label">CPU</div>
-                <div className="dashboard-overview-value">{cpuUsage.toFixed(1)}%</div>
+                <div className="dashboard-overview-value">{formatOneDecimal(cpuUsage)}%</div>
                 <div className="dashboard-overview-meta">{monitor?.cpu_count || 0} cores online</div>
               </div>
             </div>
@@ -734,8 +740,8 @@ export default function Home() {
             <div className="dashboard-overview-card dashboard-overview-card-memory">
               <div className="dashboard-overview-copy">
                 <div className="dashboard-overview-label">RAM</div>
-                <div className="dashboard-overview-value">{ramUsage.toFixed(1)} / {ramTotal.toFixed(1)} GB</div>
-                <div className="dashboard-overview-meta">{ramUsagePercent.toFixed(0)}% in use</div>
+                <div className="dashboard-overview-value">{formatOneDecimal(ramUsage)} / {formatOneDecimal(ramTotal)} GB</div>
+                <div className="dashboard-overview-meta">{formatOneDecimal(ramUsagePercent)}% in use</div>
               </div>
             </div>
 
@@ -743,7 +749,7 @@ export default function Home() {
               <div className="dashboard-overview-copy">
                 <div className="dashboard-overview-label">Workers</div>
                 <div className="dashboard-overview-value">{gpuReadyCount} ready</div>
-                <div className="dashboard-overview-meta">{gpuEnabledCount} enabled · {totalVram} GB VRAM</div>
+                <div className="dashboard-overview-meta">{gpuEnabledCount} enabled · {formatOneDecimal(totalVram)} GB VRAM</div>
               </div>
             </div>
 
@@ -771,7 +777,7 @@ export default function Home() {
                 <div className="dashboard-panel-kpis">
                   <div className="dashboard-panel-kpi">
                     <span className="dashboard-panel-kpi-label">Live</span>
-                    <span className="dashboard-panel-kpi-value">{cpuUsage.toFixed(1)}%</span>
+                    <span className="dashboard-panel-kpi-value">{formatOneDecimal(cpuUsage)}%</span>
                   </div>
                 </div>
               </div>
@@ -782,7 +788,7 @@ export default function Home() {
                     <div className="dashboard-chart-card-label">CPU Utilization</div>
                     <div className="dashboard-chart-card-meta">Overall utilization history</div>
                   </div>
-                  <div className="dashboard-chart-card-live">{cpuUsage.toFixed(1)}%</div>
+                  <div className="dashboard-chart-card-live">{formatOneDecimal(cpuUsage)}%</div>
                 </div>
                 <div className="chart dashboard-chart-canvas">
                   <canvas ref={cpuRef}/>
@@ -798,13 +804,13 @@ export default function Home() {
                   <div className="dashboard-panel-eyebrow">System</div>
                   <h5 className="dashboard-panel-title">Memory</h5>
                   <div className="dashboard-panel-subtitle">
-                    {monitor ? `${ramTotal.toFixed(1)} GB total system memory` : "Waiting for monitor data"}
+                    {monitor ? `${formatOneDecimal(ramTotal)} GB total system memory` : "Waiting for monitor data"}
                   </div>
                 </div>
                 <div className="dashboard-panel-kpis">
                   <div className="dashboard-panel-kpi">
                     <span className="dashboard-panel-kpi-label">Live</span>
-                    <span className="dashboard-panel-kpi-value">{ramUsage.toFixed(1)} / {ramTotal.toFixed(1)} GB</span>
+                    <span className="dashboard-panel-kpi-value">{formatOneDecimal(ramUsage)} / {formatOneDecimal(ramTotal)} GB</span>
                   </div>
                 </div>
               </div>
@@ -815,7 +821,7 @@ export default function Home() {
                     <div className="dashboard-chart-card-label">RAM Utilization</div>
                     <div className="dashboard-chart-card-meta">Overall utilization</div>
                   </div>
-                  <div className="dashboard-chart-card-live">{ramUsagePercent.toFixed(0)}%</div>
+                  <div className="dashboard-chart-card-live">{formatOneDecimal(ramUsagePercent)}%</div>
                 </div>
                 <div className="chart dashboard-chart-canvas">
                   <canvas ref={ramRef}/>

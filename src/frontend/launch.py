@@ -24,11 +24,18 @@ async def proxy(path):
         return Response("Upgrade handled on /socket.io/", status=426)
 
     async with httpx.AsyncClient() as client:
+        forward_headers = {
+            k: v
+            for k, v in request.headers.items()
+            if k.lower() not in {"host", "accept-encoding"}
+        }
+        # Force identity encoding so the proxy never forwards compressed log bytes as plain text.
+        forward_headers["accept-encoding"] = "identity"
         backend_url = f"{BACKEND_URL}/{path}"
         resp = await client.request(
             request.method,
             backend_url,
-            headers={k: v for k, v in request.headers.items() if k.lower() != "host"},
+            headers=forward_headers,
             content=await request.get_data(),
             params=request.args
         )
@@ -161,6 +168,7 @@ async def ongoing_task_page():
 async def completed_task_page():
     return await send_from_directory(app.static_folder, "index.html")
 
+@app.route("/logs")
 @app.route("/logs/")
 async def logs():
     return await send_from_directory(app.static_folder, "index.html")
@@ -172,6 +180,18 @@ async def notfound():
 @app.errorhandler(404)
 async def catch_all(path):
     return redirect("/404")
+
+def suppress_ssl_shutdown_timeout(loop, context):
+    exception = context.get("exception")
+    if isinstance(exception, TimeoutError) and "SSL shutdown timed out" in str(exception):
+        logger.debug("Suppressed benign SSL shutdown timeout from a closed client connection.")
+        return
+    loop.default_exception_handler(context)
+
+async def run_frontend_server(config):
+    loop = asyncio.get_running_loop()
+    loop.set_exception_handler(suppress_ssl_shutdown_timeout)
+    await serve(app, config)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Start ANT frontend")
@@ -193,4 +213,4 @@ if __name__ == "__main__":
 
     print(f"Running frontend at https://0.0.0.0:{opt['frontend_port']}")
     
-    asyncio.run(serve(app, config))
+    asyncio.run(run_frontend_server(config))

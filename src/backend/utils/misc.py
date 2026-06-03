@@ -1,11 +1,27 @@
 import os
 import re
+import uuid
+import random
 import datetime
 import functools
 import subprocess
 from typing import List
 
 INF = float('inf')
+
+TASK_ID_TEMPLATE_ADJECTIVES = [
+    "amber", "brisk", "calm", "cedar", "clear", "cobalt", "crisp", "dawn",
+    "ember", "frost", "gold", "granite", "harbor", "ivory", "jade", "lunar",
+    "maple", "mellow", "nova", "oak", "olive", "onyx", "quiet", "rapid",
+    "river", "silver", "solar", "spruce", "steady", "summit", "swift", "wild",
+]
+TASK_ID_TEMPLATE_NOUNS = [
+    "anchor", "aurora", "badger", "beacon", "brook", "canvas", "comet", "falcon",
+    "field", "forest", "glacier", "harvest", "hawk", "meadow", "orbit", "otter",
+    "pine", "ridge", "rocket", "sparrow", "stone", "stream", "thunder", "trail",
+    "voyager", "wave", "willow", "wind", "wolf", "zephyr",
+]
+TASK_ID_TEMPLATE_PATTERN = re.compile(r"\[(.+?)\]|\{(.+?)\}")
 
 def list2str(x : List, newline : bool = False):
     if isinstance(x, str):
@@ -177,6 +193,53 @@ def sanitize_task_id(task_id):
         task_id = task_id.replace(k,v)
     print(task_id)
     return task_id
+
+def random_task_phrase() -> str:
+    return f"{random.choice(TASK_ID_TEMPLATE_ADJECTIVES)}-{random.choice(TASK_ID_TEMPLATE_NOUNS)}"
+
+def _render_task_id_token(token: str) -> str:
+    normalized = token.strip().lower()
+    now = datetime.datetime.now()
+
+    if normalized in {"uuid", "uuid4"}:
+        return str(uuid.uuid4())
+    if normalized == "uuid8":
+        return uuid.uuid4().hex[:8]
+    if normalized == "date":
+        return now.strftime('%Y%m%d')
+    if normalized == "time":
+        return now.strftime('%H%M%S')
+    if normalized == "datetime":
+        return now.strftime('%Y%m%d-%H%M%S')
+    if normalized in {"random_phrase", "phrase"}:
+        return random_task_phrase()
+    if normalized.startswith('randint:'):
+        _, start, end = normalized.split(':', maxsplit=2)
+        start_i = int(start)
+        end_i = int(end)
+        if start_i > end_i:
+            raise ValueError(f"Invalid task id template range: {token}")
+        return str(random.randint(start_i, end_i))
+
+    raise ValueError(f"Unsupported task id template token: {token}")
+
+def render_task_id_template(task_id: str | None) -> str | None:
+    if task_id is None:
+        return None
+
+    task_id = str(task_id).strip()
+    if task_id == '':
+        return task_id
+
+    task_id = re.sub(r'uuid\.uuid4\(\)', lambda _: str(uuid.uuid4()), task_id)
+
+    if '[' not in task_id and '{' not in task_id:
+        return task_id
+
+    return TASK_ID_TEMPLATE_PATTERN.sub(
+        lambda match: _render_task_id_token(match.group(1) or match.group(2)),
+        task_id,
+    )
 
 def ensure_string_literal(v: str):
     if isinstance(v, str):

@@ -10,8 +10,10 @@ from loader import base_loader
 from logger import base_logger
 from monitor import ThreadedMonitor
 from utils.misc import (handle_singular_or_plural, list2str,
-                        parse_and_truncate_file, split_commands,
-                        sanitize_task_id, increment_task_id)
+                        parse_and_truncate_file, read_last_n_lines, split_commands,
+                        sanitize_task_id, increment_task_id,
+                        render_task_id_template)
+from utils.recovery import RecoveryStore
 from utils.structures import AntTask
 
 from . import base_runner
@@ -37,6 +39,11 @@ class gpu_runner(base_runner):
         self.handler = handler
         self.logger = self.setup_logger(logger)
         self.loader = loader
+        self.recovery_enabled = self.opt.get("RECOVERY_enabled", True)
+        self.recovery_store = RecoveryStore(self.opt)
+        loaded_recovery = self.recovery_store.load() if self.recovery_enabled else RecoveryStore.empty_history()
+        self.pending_recovery = loaded_recovery if RecoveryStore.has_tasks(loaded_recovery) else RecoveryStore.empty_history()
+        self.recovery_prompt_consumed = False
 
         # Initialize GPU monitoring
         self.monitor = ThreadedMonitor(opt)
@@ -57,6 +64,164 @@ class gpu_runner(base_runner):
 
         self.logger.info(f"GPURunner initialized: GPUs={list2str(self.gpu_ids)}")
 
+    @staticmethod
+    def _normalize_task_id_override(value):
+        if value is None:
+            return None
+        value = str(value).strip()
+        if value == "" or value.lower() in {"none", "null"}:
+            return None
+        return value
+
+    def _has_pending_recovery(self):
+        return self.recovery_enabled and RecoveryStore.has_tasks(self.pending_recovery)
+
+    def persist_recovery_snapshot(self, force: bool = False):
+        if not self.recovery_enabled:
+            return
+        self.recovery_store.write(
+            queued=self.loader.get_queue(),
+            ongoing=self.task_ongoing.values(),
+            completed=self.task_completed,
+            carried_history=self.pending_recovery if self._has_pending_recovery() else None,
+        )
+
+    @staticmethod
+    def _format_recovery_task(task_state, section, session_id):
+        task = AntTask.from_state_dict(task_state)
+        if section == "completed":
+            status = "Terminated" if task.terminated else "Completed"
+        elif section == "ongoing":
+            status = "Interrupted"
+        else:
+            status = "Queued"
+
+        return {
+            "session_id": session_id,
+            "section": section,
+            "recovery_key": f"{session_id}:{section}:{task.task_id}",
+            "task_id": task.task_id,
+            "status": status,
+            "start_time": task.get_time(type="start", formatted=True) or "-",
+            "duration": task.get_time(type="runtime", formatted=True),
+            "command": task.command,
+            "n_gpus": getattr(task, "n_gpus", 0),
+            "envar": task.envar,
+        }
+
+    @classmethod
+    def _format_recovery_session(cls, session):
+        session_id = session.get("session_id")
+        return {
+            "session_id": session_id,
+            "saved_at": session.get("saved_at"),
+            "ongoing": [cls._format_recovery_task(task, "ongoing", session_id) for task in session.get("ongoing", [])],
+            "queued": [cls._format_recovery_task(task, "queued", session_id) for task in session.get("queued", [])],
+            "completed": [cls._format_recovery_task(task, "completed", session_id) for task in session.get("completed", [])],
+        }
+
+    def get_recovery_state(self, consume_prompt: bool = True):
+        history = RecoveryStore.normalize_history(self.pending_recovery)
+        sessions = history.get("sessions", [])
+        formatted_sessions = [self._format_recovery_session(session) for session in sessions]
+        last_session = formatted_sessions[0] if formatted_sessions else None
+        earlier_sessions = formatted_sessions[1:]
+        has_pending = self._has_pending_recovery()
+        should_prompt = has_pending
+        if consume_prompt:
+            should_prompt = has_pending and not self.recovery_prompt_consumed
+            if should_prompt:
+                self.recovery_prompt_consumed = True
+
+        return {
+            "pending": should_prompt,
+            "has_history": has_pending,
+            "last_session": last_session,
+            "earlier_sessions": earlier_sessions,
+            "session_count": len(formatted_sessions),
+            "saved_at": last_session.get("saved_at") if last_session else None,
+            "ongoing": last_session.get("ongoing", []) if last_session else [],
+            "queued": last_session.get("queued", []) if last_session else [],
+            "completed": last_session.get("completed", []) if last_session else [],
+        }
+
+    def dismiss_recovery(self):
+        self.recovery_prompt_consumed = True
+        return {"status": "success", "message": "Recovery candidates kept for later."}
+
+    def _entries_from_recovery_request(self, data):
+        data = data or {}
+        entries = RecoveryStore.normalize_entries(data.get("entries", []))
+        if entries:
+            return entries
+
+        legacy_entries = []
+        legacy_entries.extend(RecoveryStore.entries_from_legacy_selection(self.pending_recovery, "ongoing", data.get("ongoing_task_ids", [])))
+        legacy_entries.extend(RecoveryStore.entries_from_legacy_selection(self.pending_recovery, "queued", data.get("queued_task_ids", [])))
+        legacy_entries.extend(RecoveryStore.entries_from_legacy_selection(self.pending_recovery, "completed", data.get("completed_task_ids", [])))
+        return legacy_entries
+
+    def restore_recovery(self, data):
+        if not self._has_pending_recovery():
+            return {"status": "success", "message": "No pending recovery candidates.", "restored": {}}
+
+        restored = {
+            "ongoing_to_queue": [],
+            "queued": [],
+            "completed": [],
+            "failed": [],
+        }
+        entries_to_remove = []
+
+        tasks_to_queue = []
+        completed_tasks = []
+        selected_entries = self._entries_from_recovery_request(data)
+        for entry, task in RecoveryStore.select_entries(self.pending_recovery, selected_entries):
+            section = entry["section"]
+            if section == "completed":
+                completed_tasks.append((entry, task))
+                continue
+
+            task.reset()
+            task.runner_envar.pop("CUDA_VISIBLE_DEVICES", None)
+            restore_section = "ongoing_to_queue" if section == "ongoing" else "queued"
+            tasks_to_queue.append((entry, restore_section, task))
+
+        for entry, section, task in tasks_to_queue:
+            ok, message = self.add_task_to_queue(task, allow_partial=True)
+            if ok:
+                restored[section].append(task.task_id)
+                entries_to_remove.append(entry)
+            else:
+                restored["failed"].append({"task_id": task.task_id, "message": message})
+
+        for entry, task in completed_tasks:
+            if task.task_id in self.task_ongoing or task.task_id in [_t.task_id for _t in self.loader.get_queue()]:
+                restored["failed"].append({
+                    "task_id": task.task_id,
+                    "message": "A running or queued task already uses this task id.",
+                })
+                continue
+            self.add_task_to_history(task)
+            restored["completed"].append(task.task_id)
+            entries_to_remove.append(entry)
+
+        self.pending_recovery = RecoveryStore.remove_entries(self.pending_recovery, entries_to_remove)
+        self.recovery_prompt_consumed = True
+        self.persist_recovery_snapshot(force=True)
+        return {"status": "success", "message": "Recovery applied.", "restored": restored}
+
+    def delete_recovery_tasks(self, data):
+        entries = self._entries_from_recovery_request(data)
+        if not entries:
+            return {"status": "success", "message": "No recovery tasks selected for deletion."}
+
+        self.pending_recovery = RecoveryStore.remove_entries(self.pending_recovery, entries)
+        if not self._has_pending_recovery():
+            self.recovery_prompt_consumed = True
+        self.persist_recovery_snapshot(force=True)
+        return {"status": "success", "message": "Recovery tasks removed from history."}
+
     def _ADGS_check(self) -> None:
         """
         ADGS Detection Logic
@@ -64,21 +229,32 @@ class gpu_runner(base_runner):
         if not self.opt.get("ADGS_enabled", False):
             return
 
-        threshold_usage = self.opt.get("ADGS_thresh_usage", 0.5)
-        threshold_mem = self.opt.get("ADGS_mem_usage", 0.5)
+        threshold_usage = self.opt.get("ADGS_usage_threshold", 0.5)
+        threshold_mem = self.opt.get("ADGS_mem_threshold", 0.5)
+        stats = self.monitor.current_stats
+        gpu_memory = stats.get("gpu_memory", [])
+        gpu_total_memory = stats.get("gpu_total_memory", [])
 
-        for idx, hist in enumerate(self.system_stats["gpu_usage"]):
-            recent_usage = sum(hist[-20:]) / 20
+        for idx, hist in enumerate(stats.get("gpu_usage", [])):
+            if idx >= len(gpu_memory) or idx >= len(gpu_total_memory):
+                continue
+
+            recent_usage_values = hist[-20:]
+            if not recent_usage_values:
+                continue
+
+            recent_usage = sum(recent_usage_values) / len(recent_usage_values)
+            recent_mem_values = gpu_memory[idx][-20:]
             recent_mem = (
-                sum(self.system_stats["gpu_memory"][idx][-20:])
-                / 20
-                / self.system_stats["gpu_total_memory"][idx]
+                sum(recent_mem_values)
+                / max(len(recent_mem_values), 1)
+                / max(gpu_total_memory[idx], 1)
             )
             if recent_usage > threshold_usage or recent_mem > threshold_mem:
                 self.gpu_availability[idx] = 0
             else:
                 # only free if not in use by our tasks
-                if not any(idx in t["gpu_idx"] for t in self._ongoing_tasks):
+                if not any(idx in getattr(task, "gpu_idx", []) for task in self.task_ongoing.values()):
                     self.gpu_availability[idx] = 1
 
     def set_gpu_states(
@@ -110,7 +286,7 @@ class gpu_runner(base_runner):
             return
 
         if idx == "all":
-            var = [value] * len(var)
+            var[:] = [value] * len(var)
         else:
             for i in [idx] if isinstance(idx, int) else idx:
                 var[i] = value
@@ -194,6 +370,8 @@ class gpu_runner(base_runner):
             if all(success):
                 for _t in task_to_queue:
                     self.loader.append(entry=_t)
+
+        self.persist_recovery_snapshot()
                 
         return list(zip(success, message))
     
@@ -204,6 +382,15 @@ class gpu_runner(base_runner):
         success = []
         for task_id in task_ids:
             success.append(self.loader.remove(task_id=task_id))
+        self.persist_recovery_snapshot()
+        return success
+
+    @handle_singular_or_plural
+    def promote_task_in_queue(self, task_ids: List[AntTask | str]):
+        success = []
+        for task_id in task_ids:
+            success.append(self.loader.promote_to_front(task_id=task_id))
+        self.persist_recovery_snapshot()
         return success
 
     def modify_task_in_queue(
@@ -221,10 +408,14 @@ class gpu_runner(base_runner):
         for task in tasks:
             if task.task_id in self.task_id_history:
                 # if found, overwrite
-                self.task_completed[self.task_id_history.index(task.task_id)] = task
+                for idx, completed_task in enumerate(self.task_completed):
+                    if completed_task.task_id == task.task_id:
+                        self.task_completed[idx] = task
+                        break
             else:
                 self.task_id_history.add(task.task_id)
                 self.task_completed.append(task)
+        self.persist_recovery_snapshot()
     
     @handle_singular_or_plural
     def remove_task_from_history(self,
@@ -238,10 +429,11 @@ class gpu_runner(base_runner):
             self.task_id_history.remove(task_id)
             for _t in self.task_completed:
                 if _t.task_id == task_id:
-                    self.task_completed .remove(_t)
+                    self.task_completed.remove(_t)
                     break
             success.append(True)
             self.logger.info(f'Removed task {task_id} from task history. Please remember to backup your logs before starting new task with the same ID.')
+        self.persist_recovery_snapshot()
         return success
     
     def try_dispatch_task(self):
@@ -281,6 +473,7 @@ class gpu_runner(base_runner):
             self.logger.info(
                 f"Task {s_task.task_id} on GPU {list2str(gpu_ids)} started."
             )
+            self.persist_recovery_snapshot()
 
     def check_finished_task(self):
         # move finished task to self.task_completed
@@ -300,6 +493,8 @@ class gpu_runner(base_runner):
             self.logger.info(
                 f"Task {f_task.task_id} finished. Took {f_task.get_time(type='runtime', formatted=True)}"
             )
+        if task_id_status["completed_process"]:
+            self.persist_recovery_snapshot()
     
     @handle_singular_or_plural
     def kill_task(self, 
@@ -330,6 +525,7 @@ class gpu_runner(base_runner):
                 f"Task {task.task_id} Terminated. Took {task.get_time(type='runtime', formatted=True)}"
             )
             result.append(True)
+        self.persist_recovery_snapshot()
         return result
 
     def step(self):
@@ -382,6 +578,16 @@ class gpu_runner(base_runner):
             'queued': len(result['task_queue']),
             'running': len(result['task_ongoing']),
             'completed': len(result['task_completed']),
+        }
+
+        result['visualizer'] = {
+            'terminal_win_height': self.opt.get('VISUALIZER_terminal_win_height', 20),
+            'view_log_max_lines': self.opt.get('VISUALIZER_view_log_max_lines', 500),
+            'completed_output_default_lines': self.opt.get('VISUALIZER_completed_output_default_lines', 50),
+            'ongoing_output_line_control_enabled': self.opt.get('VISUALIZER_ongoing_output_line_control_enabled', True),
+            'completed_output_line_control_enabled': self.opt.get('VISUALIZER_completed_output_line_control_enabled', True),
+            'output_min_lines': self.opt.get('VISUALIZER_output_min_lines', 2),
+            'output_max_lines': self.opt.get('VISUALIZER_output_max_lines', 12),
         }
 
         # monitors
@@ -447,7 +653,8 @@ class gpu_runner(base_runner):
 
     def get_log(self,
                 task_id: str,
-                full_log: bool = False) -> Tuple[bool, str]:
+                full_log: bool = False,
+                tail_lines: Optional[int] = None) -> Tuple[bool, str]:
         task = None
         if task_id in self.task_ongoing:
             task = self.task_ongoing[task_id]
@@ -473,6 +680,11 @@ class gpu_runner(base_runner):
             if full_log:
                 with open(filename) as f:
                     rendered_file = f.read()
+            elif tail_lines is not None:
+                rendered_lines = read_last_n_lines(filename, tail_lines)
+                rendered_file = '\n'.join(rendered_lines)
+                if rendered_file:
+                    rendered_file += '\n'
             else:
                 rendered_file = parse_and_truncate_file(
                     filename=filename,
@@ -584,23 +796,37 @@ class gpu_runner(base_runner):
                 command = data.get('command', None) # this has to be present, if not AntTask can't initialize
                 
                 # try parsing gpu_runner-specific args from envar
+                if 'ant_task_id' in envar:
+                    task_id_from_envar = self._normalize_task_id_override(envar['ant_task_id'])
+                    del envar['ant_task_id']
+                else:
+                    task_id_from_envar = None
+
                 if 'ant_n_gpus' in envar:
                     n_gpus_from_envar = envar['ant_n_gpus']
                     del envar['ant_n_gpus']
                 else:
-                    n_gpus_from_envar = self.opt.get("RUNNER_default_n_gpus", 0)
+                    n_gpus_from_envar = None
                 
                 # try parsing gpu_runner-specific args from cmd
                 n_gpus_from_cmd, task_id_from_cmd, envar_from_cmd, cleaned_c = self.parse_args(command)
                 envar.update(envar_from_cmd)
                 
                 # if args from cmd present, prioritize it.
-                data['n_gpus'] = n_gpus_from_cmd or n_gpus_from_envar or data.get('n_gpus', self.opt.get("RUNNER_default_n_gpus", 0))
-                task_id = task_id_from_cmd or task_id
+                data['n_gpus'] = (
+                    n_gpus_from_cmd
+                    if n_gpus_from_cmd is not None
+                    else n_gpus_from_envar
+                    if n_gpus_from_envar is not None
+                    else data.get('n_gpus', self.opt.get("RUNNER_default_n_gpus", 0))
+                )
+                task_id = task_id_from_cmd or task_id_from_envar or task_id
 
                 # randomize uuid lmao
                 if task_id is None:
                     task_id = str(uuid.uuid4())
+
+                task_id = render_task_id_template(task_id)
                 
                 task_id = sanitize_task_id(task_id=task_id)
 
@@ -613,15 +839,22 @@ class gpu_runner(base_runner):
 
             elif queue_mode == 'multi':
                 tasks = []
-                envar = data.get('envar', {})
+                envar = copy.deepcopy(data.get('envar', {}))
                 task_id = data.get('task_id', None)
             
                 # try parsing gpu_runner-specific args from envar
+                if 'ant_task_id' in envar:
+                    task_id_from_envar = self._normalize_task_id_override(envar['ant_task_id'])
+                    del envar['ant_task_id']
+                else:
+                    task_id_from_envar = None
+
                 if 'ant_n_gpus' in envar:
                     n_gpus_from_envar = envar['ant_n_gpus']
                     del envar['ant_n_gpus']
                 else:
                     n_gpus_from_envar = self.opt.get("RUNNER_default_n_gpus", 0)
+                base_envar = copy.deepcopy(envar)
             
                 for c in split_commands(data['command']):
                     # try parsing gpu_runner-specific args from cmd
@@ -629,18 +862,21 @@ class gpu_runner(base_runner):
 
                     # if args from cmd present, prioritize it.
                     n_gpus = n_gpus_from_envar if n_gpus_from_cmd is None else n_gpus_from_cmd
-                    envar.update(envar_from_cmd)
+                    task_envar = copy.deepcopy(base_envar)
+                    task_envar.update(envar_from_cmd)
 
                     # randomize uuid lmao
-                    if task_id_from_cmd is None:
-                        task_id_from_cmd = str(uuid.uuid4())
+                    resolved_task_id = task_id_from_cmd or task_id_from_envar or task_id
+                    if resolved_task_id is None:
+                        resolved_task_id = str(uuid.uuid4())
 
-                    task_id_from_cmd = sanitize_task_id(task_id=task_id_from_cmd)
+                    resolved_task_id = render_task_id_template(resolved_task_id)
+                    resolved_task_id = sanitize_task_id(task_id=resolved_task_id)
                         
                     tasks.append(AntTask(command=cleaned_c,
-                                         task_id=task_id_from_cmd,
+                                         task_id=resolved_task_id,
                                          n_gpus=n_gpus,
-                                         envar=envar))
+                                         envar=task_envar))
             else:
                 self.logger.error(f"queue_mode: '{queue_mode}' is not recognized. Expected value: 'single' / 'muilti'")
                 return {'status' : 'error', 

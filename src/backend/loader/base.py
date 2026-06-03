@@ -27,6 +27,10 @@ class base_loader():
         Add an entry from the queue.
         """
         pass
+
+    def promote_to_front(self, *args, **kwargs) -> Any:
+        """Move a queued entry to the front of the queue."""
+        pass
     
     def get_queue(self, *args, **kwargs) -> Any:
         """Get Queue Method.

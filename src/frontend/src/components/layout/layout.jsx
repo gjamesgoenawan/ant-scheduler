@@ -12,7 +12,7 @@ const SIDEBAR_THRESHOLD = 1200; // same as the JS logic
 
 export { useToast };
 
-export default function Layout({ children, pageTitle }) {
+export default function Layout({ children, pageTitle, pageActions }) {
   const [messages, setMessages] = useState([]);
   const [sidebarPinned, setSidebarPinned] = useState(window.innerWidth > SIDEBAR_THRESHOLD);
 
@@ -22,7 +22,7 @@ export default function Layout({ children, pageTitle }) {
   useEffect(() => {
     // Set the browser's document title
     document.title = pageTitle;
-  }, []);
+  }, [pageTitle]);
 
   // Auto-update pinned state based on window width
   useEffect(() => {
@@ -48,7 +48,7 @@ export default function Layout({ children, pageTitle }) {
         <Sidebar pinned={sidebarPinned} />
         <main className="main-content position-relative border-radius-lg">
           <div className="container-fluid bg-gray-200 app-shell" style={{ minHeight: "100vh" }}>
-            <Navbar pageTitle={pageTitle} toggleSidebar={toggleSidebar} />
+            <Navbar pageTitle={pageTitle} toggleSidebar={toggleSidebar} actions={pageActions} />
             {children}
           </div>
         </main>

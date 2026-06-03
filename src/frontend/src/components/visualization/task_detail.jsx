@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { buildOutputWindowStyle } from "../../utils/outputWindow";
 
 export default function TaskDetail({
   taskId,
@@ -10,15 +11,31 @@ export default function TaskDetail({
   outputType = "log",
   outputContent = "",
   outputMinHeight = "300px",
+  outputMinLines = null,
+  outputMaxLines = null,
   collapsible = false,
   defaultExpanded = true,
+  expanded,
+  onExpandedChange,
   loading = false,
   notFound = false,
   loadingMessage = "Loading task details...",
   notFoundMessage = null,
 }) {
   const terminalRef = useRef(null);
-  const [showDetails, setShowDetails] = useState(defaultExpanded);
+  const [localShowDetails, setLocalShowDetails] = useState(defaultExpanded);
+  const isControlled = expanded !== undefined;
+  const showDetails = isControlled ? expanded : localShowDetails;
+
+  const setShowDetails = (nextValue) => {
+    const next = typeof nextValue === "function" ? nextValue(showDetails) : nextValue;
+    if (!isControlled) {
+      setLocalShowDetails(next);
+    }
+    if (onExpandedChange) {
+      onExpandedChange(next);
+    }
+  };
 
   useEffect(() => {
     if (!collapsible || outputType !== "terminal" || !showDetails) return;
@@ -41,7 +58,9 @@ export default function TaskDetail({
   const shouldShowDetails = collapsible ? showDetails : true;
   const outputShellStyle =
     outputType === "terminal"
-      ? { minHeight: "180px", maxHeight: "250px" }
+      ? outputMinLines && outputMaxLines
+        ? buildOutputWindowStyle(outputMinLines, outputMaxLines)
+        : { minHeight: "180px", maxHeight: "250px" }
       : { minHeight: outputMinHeight };
 
   const titleNode = (

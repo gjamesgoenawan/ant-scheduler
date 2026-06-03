@@ -6,6 +6,17 @@ import React, {
   useImperativeHandle,
 } from "react";
 import { API_URL } from "../../App";
+import TaskIdTemplateHelp from "./task_id_template_help";
+
+const ENV_VAR_PRESETS = [
+  { key: "ant_task_id", value: '"[uuid]"', label: "ant_task_id", defaultLabel: "[uuid]" },
+  { key: "ant_n_gpus", value: "0", label: "ant_n_gpus", defaultLabel: "0" },
+  { key: "ant_wd", value: '"./"', label: "ant_wd", defaultLabel: "./" },
+  { key: "ant_conda_env", value: "null", label: "ant_conda_env", defaultLabel: "None" },
+  { key: "ant_conda_env_path", value: "null", label: "ant_conda_env_path", defaultLabel: "None" },
+  { key: "ant_conda_path", value: '"conda"', label: "ant_conda_path", defaultLabel: "conda" },
+  { key: "custom", value: "", label: "custom", defaultLabel: "manual" },
+];
 
 function generateId() {
   return (
@@ -21,7 +32,26 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
   const [mode, setMode] = useState("table"); // "table" or "textarea"
   const [textValue, setTextValue] = useState(""); 
   const [textError, setTextError] = useState(null); 
-  const savingRef = useRef(false);
+  const [isPresetMenuOpen, setIsPresetMenuOpen] = useState(false);
+  const rowsRef = useRef([]);
+  const textValueRef = useRef("");
+  const modeRef = useRef("table");
+  const saveChainRef = useRef(Promise.resolve());
+
+  const updateRowsState = (nextRows) => {
+    rowsRef.current = nextRows;
+    setRows(nextRows);
+  };
+
+  const updateTextValueState = (nextText) => {
+    textValueRef.current = nextText;
+    setTextValue(nextText);
+  };
+
+  const updateModeState = (nextMode) => {
+    modeRef.current = nextMode;
+    setMode(nextMode);
+  };
 
   useEffect(() => {
     (async () => {
@@ -30,8 +60,8 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
         if (!res.ok) return;
         const data = await res.json();
         const loaded = objectToRows(data || {});
-        setRows(loaded);
-        setTextValue(JSON.stringify(data || {}, null, 2));
+        updateRowsState(loaded);
+        updateTextValueState(JSON.stringify(data || {}, null, 2));
         if (onLoad) onLoad(data || {});
       } catch (e) {
         console.error("Failed to load env:", e);
@@ -108,9 +138,15 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
     return { valid: Object.keys(idErr).length === 0, keyErrors: idErr };
   };
 
-  const commitSaveRows = async (rs) => {
-    if (savingRef.current) return Promise.reject("Environment variable saving in progress");
+  const parseTextObject = (text) => {
+    const parsed = JSON.parse(text ? text : "{}");
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      throw new Error("JSON must be an object of key: value pairs");
+    }
+    return parsed;
+  };
 
+  const commitSaveRows = async (rs) => {
     const { valid, keyErrors: valKeyErr } = validateRows(rs);
     setKeyErrors(valKeyErr);
     setTextError(null);
@@ -118,38 +154,38 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
 
     const payload = rowsToObject(rs);
 
-    savingRef.current = true;
-    try {
-      const r = await fetch(`${API_URL}/save_envar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ envar: payload }),
+    const savePromise = saveChainRef.current
+      .catch(() => {})
+      .then(async () => {
+        try {
+          const r = await fetch(`${API_URL}/save_envar`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ envar: payload }),
+          });
+          if (!r.ok) {
+            const text = await r.text().catch(() => "Save failed");
+            throw new Error(text || "Save failed");
+          }
+          setKeyErrors({});
+          updateTextValueState(JSON.stringify(payload, null, 2));
+          setTextError(null);
+          if (onSave) onSave(payload);
+          return payload;
+        } catch (err) {
+          console.error("Failed to save env:", err);
+          throw new Error(String(err.message || err));
+        }
       });
-      if (!r.ok) {
-        const text = await r.text().catch(() => "Save failed");
-        throw new Error(text || "Save failed");
-      }
-      setRows(rs);
-      setKeyErrors({});
-      setTextValue(JSON.stringify(payload, null, 2));
-      setTextError(null);
-      if (onSave) onSave(payload);
-      return payload;
-    } catch (err) {
-      console.error("Failed to save env:", err);
-      return Promise.reject(String(err.message || err));
-    } finally {
-      setTimeout(() => (savingRef.current = false), 200);
-    }
+
+    saveChainRef.current = savePromise;
+    return savePromise;
   };
 
   const commitSaveFromText = async (text) => {
     let parsed;
     try {
-      parsed = JSON.parse(text ? text : "{}");
-      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-        throw new Error("JSON must be an object of key: value pairs");
-      }
+      parsed = parseTextObject(text);
     } catch (e) {
       setTextError(String(e.message || e));
       return Promise.reject(String(e.message || e));
@@ -164,50 +200,69 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
       return Promise.reject("Validation failed");
     }
 
+    updateRowsState(newRows);
+    updateTextValueState(JSON.stringify(parsed, null, 2));
+
     return commitSaveRows(newRows);
   };
 
   useImperativeHandle(ref, () => ({
     saveNow: async () => {
-      if (mode === "textarea") {
-        return commitSaveFromText(textValue);
+      if (modeRef.current === "textarea") {
+        return commitSaveFromText(textValueRef.current);
       } else {
-        return commitSaveRows(rows);
+        return commitSaveRows(rowsRef.current);
       }
     },
-    getRows: () => rows,
-    getObject: () => rowsToObject(rows),
+    getRows: () => rowsRef.current,
+    getObject: () => {
+      if (modeRef.current === "textarea") {
+        return parseTextObject(textValueRef.current);
+      }
+      return rowsToObject(rowsRef.current);
+    },
   }));
 
-  const handleAddRow = () => {
-    const id = generateId();
-    setRows((prev) => {
-      const next = [...prev, { id, key: "", value: "" }];
-      setTextValue(JSON.stringify(rowsToObject(next), null, 2));
-      return next;
-    });
+  const handleAddPreset = (preset) => {
+    const isCustom = preset.key === "custom";
+    const next = [
+      ...rowsRef.current,
+      {
+        id: generateId(),
+        key: isCustom ? "" : preset.key,
+        value: isCustom ? "" : preset.value,
+      },
+    ];
+
+    setPresetMenuOpen(false);
+    updateRowsState(next);
+    updateTextValueState(JSON.stringify(rowsToObject(next), null, 2));
+
+    if (!isCustom) {
+      commitSaveRows(next).catch((e) => console.error("Save after add preset failed:", e));
+    }
+  };
+
+  const setPresetMenuOpen = (open) => {
+    setIsPresetMenuOpen(open);
   };
 
   const handleDelete = async (id) => {
-    setRows((prev) => {
-      const next = prev.filter((r) => r.id !== id);
-      setTextValue(JSON.stringify(rowsToObject(next), null, 2));
-      return next;
-    });
+    const next = rowsRef.current.filter((r) => r.id !== id);
+    updateRowsState(next);
+    updateTextValueState(JSON.stringify(rowsToObject(next), null, 2));
 
     try {
-      await commitSaveRows(rows.filter((r) => r.id !== id));
+      await commitSaveRows(next);
     } catch (e) {
       console.error("Save after delete failed:", e);
     }
   };
 
   const handleFieldChange = (id, field, value) => {
-    setRows((prev) => {
-      const next = prev.map((r) => (r.id === id ? { ...r, [field]: value } : r));
-      setTextValue(JSON.stringify(rowsToObject(next), null, 2));
-      return next;
-    });
+    const next = rowsRef.current.map((r) => (r.id === id ? { ...r, [field]: value } : r));
+    updateRowsState(next);
+    updateTextValueState(JSON.stringify(rowsToObject(next), null, 2));
     if (field === "key") {
       setKeyErrors((prev) => {
         if (!prev[id]) return prev;
@@ -219,16 +274,14 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
   };
 
   const handleBlur = (id, field, newValue) => {
-    setRows((prev) => {
-      const updatedRows = prev.map((r) => (r.id === id ? { ...r, [field]: newValue } : r));
-      setTextValue(JSON.stringify(rowsToObject(updatedRows), null, 2));
-      commitSaveRows(updatedRows).catch(() => {});
-      return updatedRows;
-    });
+    const updatedRows = rowsRef.current.map((r) => (r.id === id ? { ...r, [field]: newValue } : r));
+    updateRowsState(updatedRows);
+    updateTextValueState(JSON.stringify(rowsToObject(updatedRows), null, 2));
+    commitSaveRows(updatedRows).catch(() => {});
   };
 
   const handleTextChange = (e) => {
-    setTextValue(e.target.value);
+    updateTextValueState(e.target.value);
     setTextError(null);
   };
 
@@ -237,33 +290,35 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
   };
 
   const toggleMode = () => {
-    if (mode === "table") {
-      setTextValue(JSON.stringify(rowsToObject(rows), null, 2));
+    setPresetMenuOpen(false);
+    if (modeRef.current === "table") {
+      updateTextValueState(JSON.stringify(rowsToObject(rowsRef.current), null, 2));
       setTextError(null);
-      setMode("textarea");
+      updateModeState("textarea");
     } else {
       try {
-        const parsed = JSON.parse(textValue);
-        if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-          setTextError("JSON must be an object of key: value pairs");
-          return;
-        }
+        const parsed = parseTextObject(textValueRef.current);
         const newRows = objectToRows(parsed);
         const { valid, keyErrors: valErr } = validateRows(newRows);
         if (!valid) {
           setKeyErrors(valErr);
-          setRows(newRows);
-          setMode("table");
+          updateRowsState(newRows);
+          updateModeState("table");
           return;
         }
-        setRows(newRows);
+        updateRowsState(newRows);
         setKeyErrors({});
-        setMode("table");
+        updateModeState("table");
       } catch (e) {
         setTextError(String(e.message || e));
       }
     }
   };
+
+  const existingPresetKeys = new Set(rows.map((row) => (row.key || "").trim()).filter(Boolean));
+  const availablePresets = ENV_VAR_PRESETS.filter(
+    (preset) => preset.key === "custom" || !existingPresetKeys.has(preset.key)
+  );
 
   return (
     <div className="">
@@ -284,6 +339,13 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
             />
           </div>
         </div>
+      </div>
+
+      <div className="mt-3">
+        <TaskIdTemplateHelp
+          compact={true}
+          storageKey="antScheduler.createTask.envTaskIdTemplateHelpExpanded"
+        />
       </div>
 
       <div className="">
@@ -352,9 +414,30 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
               </tbody>
             </table>
             <div className="d-flex justify-content-center align-items-center">
-              <button type="button" className="btn btn-link me-2" onClick={handleAddRow} disabled={mode !== "table"}>
-                + Add Variable
-              </button>
+              <div className="env-var-add-menu">
+                <button
+                  type="button"
+                  className="btn btn-link me-2 dropdown-toggle"
+                  onClick={() => setPresetMenuOpen(!isPresetMenuOpen)}
+                  disabled={mode !== "table"}
+                  aria-expanded={isPresetMenuOpen}
+                >
+                  + Add Variable
+                </button>
+                <div className={`dropdown-menu env-var-preset-menu ${isPresetMenuOpen ? "show" : ""}`}>
+                  {availablePresets.map((preset) => (
+                    <button
+                      type="button"
+                      key={preset.key}
+                      className="dropdown-item env-var-preset-item"
+                      onClick={() => handleAddPreset(preset)}
+                    >
+                      <span className="env-var-preset-key">{preset.label}</span>
+                      <span className="env-var-preset-default">{preset.defaultLabel}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         ) : (

@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import Layout, { useToast } from "../components/layout/layout";
+import LineCountControl from "../components/line_count_control";
 import { useMonitorData } from "../App";
 import {
   bulkDeleteTasks,
@@ -10,20 +11,118 @@ import {
   deleteTask,
   restartTask,
 } from "../utils/taskActions";
+import {
+  getStoredBoolean,
+  readStoredNumber,
+  readBooleanMap,
+  writeStoredValue,
+  writeBooleanMap,
+} from "../utils/persistedTaskState";
+import { fetchLogContent } from "../utils/logFetch";
+import { clampLineCount, takeLastLinesFromText } from "../utils/lineCount";
+import { buildOutputWindowStyle, getOutputWindowLines } from "../utils/outputWindow";
 
+const COMPLETED_DETAIL_STORAGE_KEY = "antScheduler.completedTasks.detailExpanded";
+const COMPLETED_OUTPUT_STORAGE_KEY = "antScheduler.completedTasks.outputExpanded";
+const COMPLETED_OUTPUT_LINE_COUNT_STORAGE_KEY = "antScheduler.completedTasks.outputLineCount";
+const COMPLETED_OUTPUT_FETCH_CHUNK = 50;
+const completedTaskOutputCache = new Map();
 
 const TaskRow = ({
   task,
   isLast,
   isSelectMode,
   isSelected,
+  isExpanded,
+  isOutputExpanded,
   onToggleSelect,
+  onToggleExpanded,
+  onToggleOutput,
   onCopy,
   onRestart,
   onDelete,
   onDownload,
+  outputLineCount,
+  outputFetchLineCount,
+  outputShellStyle,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const initialCacheEntry = completedTaskOutputCache.get(task.task_id);
+  const [outputContent, setOutputContent] = useState(initialCacheEntry?.content || "");
+  const [outputLoading, setOutputLoading] = useState(false);
+  const [outputError, setOutputError] = useState(null);
+  const [loadedOutputLineCount, setLoadedOutputLineCount] = useState(
+    initialCacheEntry?.fetchedLineCount || 0
+  );
+  const outputShellRef = useRef(null);
+
+  useEffect(() => {
+    if (!isExpanded || !isOutputExpanded) return;
+
+    const cachedEntry = completedTaskOutputCache.get(task.task_id);
+    if (cachedEntry?.content) {
+      if (cachedEntry.content !== outputContent) {
+        setOutputContent(cachedEntry.content);
+      }
+      if (cachedEntry.fetchedLineCount !== loadedOutputLineCount) {
+        setLoadedOutputLineCount(cachedEntry.fetchedLineCount);
+      }
+      setOutputError(null);
+    }
+
+    if (cachedEntry?.content && cachedEntry.fetchedLineCount >= outputFetchLineCount) {
+      return;
+    }
+
+    let cancelled = false;
+    setOutputLoading(true);
+    setOutputError(null);
+
+    fetchLogContent(task.task_id, { tailLines: outputFetchLineCount })
+      .then((content) => {
+        if (cancelled) return;
+        completedTaskOutputCache.set(task.task_id, {
+          content,
+          fetchedLineCount: outputFetchLineCount,
+        });
+        setOutputContent(content);
+        setLoadedOutputLineCount(outputFetchLineCount);
+      })
+      .catch((error) => {
+        if (cancelled) return;
+
+        const staleCacheEntry = completedTaskOutputCache.get(task.task_id);
+        if (staleCacheEntry?.content) {
+          setOutputContent(staleCacheEntry.content);
+          setLoadedOutputLineCount(staleCacheEntry.fetchedLineCount);
+          setOutputError(null);
+          return;
+        }
+
+        setOutputError(String(error.message || error));
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setOutputLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [task.task_id, isExpanded, isOutputExpanded, outputFetchLineCount, outputContent, loadedOutputLineCount]);
+
+  const displayedOutput = outputError
+    ? outputError
+    : takeLastLinesFromText(outputContent, outputLineCount);
+
+  useEffect(() => {
+    if (!isExpanded || !isOutputExpanded) return;
+
+    const ref = outputShellRef.current;
+    if (!ref) return;
+
+    ref.scrollTop = ref.scrollHeight;
+  }, [displayedOutput, isExpanded, isOutputExpanded, outputLoading]);
+
   const statusSquare = (
     <div
       className={`rounded-1 ${task.terminated ? "bg-danger" : "bg-success"}`}
@@ -99,7 +198,7 @@ const TaskRow = ({
               className="completed-task-details-btn-mobile btn btn-link text-dark p-1 mb-0 d-flex align-items-center ongoing-task-mobile-toggle"
               onClick={(e) => {
                 e.stopPropagation();
-                setIsExpanded(!isExpanded);
+                onToggleExpanded(task.task_id);
               }}
             >
               <span className="text-xxs text-uppercase font-weight-bolder">
@@ -165,7 +264,7 @@ const TaskRow = ({
             className="completed-task-details-btn completed-task-details-btn-desktop btn btn-link text-dark p-1 mb-0 d-flex align-items-center ongoing-task-mobile-toggle"
             onClick={(e) => {
               e.stopPropagation();
-              setIsExpanded(!isExpanded);
+              onToggleExpanded(task.task_id);
             }}
           >
              <span className="text-xxs text-uppercase font-weight-bolder">
@@ -179,36 +278,72 @@ const TaskRow = ({
       </div>
 
       {isExpanded ? (
-        <div className="mt-3 bg-gray-100 rounded p-3" style={{ backgroundColor: "#f8f9fa" }}>
+        <div className="completed-task-expanded-panel mt-2 bg-gray-100 rounded p-2" style={{ backgroundColor: "#f8f9fa" }}>
           <div className="row">
-             <div className="col-md-3 col-6 mb-3">
-                <span className="text-xs font-weight-bold text-secondary text-uppercase">Status</span>
-                 {detailedBadge}
-             </div>
+            <div className="col-md-3 col-6 mb-2">
+              <span className="text-xs font-weight-bold text-secondary text-uppercase">Status</span>
+              {detailedBadge}
+            </div>
 
-             <div className="col-md-3 col-6 mb-3">
-                <span className="text-xs font-weight-bold text-secondary text-uppercase">Start Time</span>
-                <p className="text-sm text-dark font-weight-bold mb-0">{task.time.start}</p>
-             </div>
+            <div className="col-md-3 col-6 mb-2">
+              <span className="text-xs font-weight-bold text-secondary text-uppercase">Start Time</span>
+              <p className="text-sm text-dark font-weight-bold mb-0">{task.time.start}</p>
+            </div>
              
-             <div className="col-md-3 col-6 mb-3">
-                <span className="text-xs font-weight-bold text-secondary text-uppercase">Duration</span>
-                <p className="text-sm text-dark font-weight-bold mb-0">{task.time.runtime}</p>
-             </div>
+            <div className="col-md-3 col-6 mb-2">
+              <span className="text-xs font-weight-bold text-secondary text-uppercase">Duration</span>
+              <p className="text-sm text-dark font-weight-bold mb-0">{task.time.runtime}</p>
+            </div>
              
-             <div className="col-md-3 col-6 mb-0">
-                <span className="text-xs font-weight-bold text-secondary text-uppercase">GPU IDs</span>
-                <p className="text-sm text-dark font-weight-bold mb-0">
-                    {task.gpu_ids.join(", ") || "No GPU Assigned"}
-                </p>
-             </div>
+            <div className="col-md-3 col-6 mb-0">
+              <span className="text-xs font-weight-bold text-secondary text-uppercase">GPU IDs</span>
+              <p className="text-sm text-dark font-weight-bold mb-0">
+                {task.gpu_ids.join(", ") || "No GPU Assigned"}
+              </p>
+            </div>
              
-             <div className="col-12 mt-1">
-                <span className="text-xs font-weight-bold text-secondary text-uppercase">Command</span>
-                <div className="p-2 border rounded bg-white mt-1">
-                    <code className="text-dark" style={{ wordBreak: "break-all" }}>{task.command}</code>
+            <div className="col-12 mt-1 task-detail-command-row">
+              <div className="text-xs font-weight-bold text-secondary text-uppercase mb-2">Command</div>
+              <div className="task-detail-command">
+                <code className="text-dark task-detail-command-text" style={{ wordBreak: "break-all" }}>{task.command}</code>
+              </div>
+            </div>
+
+            <div className="col-12 mt-2 completed-task-output-row">
+              <div className="completed-task-output-header d-flex align-items-center justify-content-between gap-2 mb-2">
+                <div className="d-flex align-items-center min-width-0">
+                  <span className="text-xxs font-weight-bolder text-secondary text-uppercase opacity-7 completed-task-output-title">
+                    Output (Last {outputLineCount} lines)
+                  </span>
                 </div>
-             </div>
+                <button
+                  type="button"
+                  className="btn btn-link text-dark p-1 mb-0 d-flex align-items-center gap-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleOutput(task.task_id);
+                  }}
+                  title={isOutputExpanded ? "Hide Output" : "Show Output"}
+                >
+                  <span className="text-xxs text-uppercase font-weight-bolder">
+                    {isOutputExpanded ? "Hide Output" : "Show Output"}
+                  </span>
+                  <i className="material-icons text-sm">
+                    {isOutputExpanded ? "expand_less" : "expand_more"}
+                  </i>
+                </button>
+              </div>
+
+              {isOutputExpanded ? (
+                <div className="bg-black text-light p-3 rounded completed-task-output-shell" ref={outputShellRef} style={outputShellStyle}>
+                  <pre className="completed-task-output-pre">
+                    {outputLoading && !outputContent
+                      ? "Loading output..."
+                      : displayedOutput || "Failed to load Log."}
+                  </pre>
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
       ) : null}
@@ -223,12 +358,55 @@ export default function CompletedTasks() {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [detailExpandedByTaskId, setDetailExpandedByTaskId] = useState(() =>
+    readBooleanMap(COMPLETED_DETAIL_STORAGE_KEY)
+  );
+  const [outputExpandedByTaskId, setOutputExpandedByTaskId] = useState(() =>
+    readBooleanMap(COMPLETED_OUTPUT_STORAGE_KEY)
+  );
+  const [outputLineCount, setOutputLineCount] = useState(() =>
+    readStoredNumber(COMPLETED_OUTPUT_LINE_COUNT_STORAGE_KEY, null)
+  );
+
+  const outputLineCap = clampLineCount(data?.visualizer?.view_log_max_lines ?? 500, 1, 5000, 500);
+  const defaultOutputLineCount = clampLineCount(
+    data?.visualizer?.completed_output_default_lines ?? 50,
+    1,
+    outputLineCap,
+    50
+  );
+  const lineControlEnabled = data?.visualizer?.completed_output_line_control_enabled !== false;
+  const effectiveOutputLineCount = clampLineCount(
+    lineControlEnabled ? outputLineCount ?? defaultOutputLineCount : defaultOutputLineCount,
+    1,
+    outputLineCap,
+    defaultOutputLineCount
+  );
+  const { minLines: outputMinLines, maxLines: outputMaxLines } = getOutputWindowLines(data?.visualizer);
+  const outputShellStyle = buildOutputWindowStyle(outputMinLines, outputMaxLines);
+  const outputFetchLineCount = Math.min(
+    outputLineCap,
+    Math.max(
+      COMPLETED_OUTPUT_FETCH_CHUNK,
+      Math.ceil(effectiveOutputLineCount / COMPLETED_OUTPUT_FETCH_CHUNK) * COMPLETED_OUTPUT_FETCH_CHUNK
+    )
+  );
 
   useEffect(() => {
     if (data?.task_completed) {
       setCompletedTasks(data.task_completed);
     }
   }, [data]);
+
+  useEffect(() => {
+    if (outputLineCount === null) return;
+
+    const clamped = clampLineCount(outputLineCount, 1, outputLineCap, defaultOutputLineCount);
+    if (clamped !== outputLineCount) {
+      setOutputLineCount(clamped);
+      writeStoredValue(COMPLETED_OUTPUT_LINE_COUNT_STORAGE_KEY, clamped);
+    }
+  }, [defaultOutputLineCount, outputLineCap]);
 
   useEffect(() => {
     setSelectedTaskIds((current) =>
@@ -252,6 +430,50 @@ export default function CompletedTasks() {
     setIsSelectMode(false);
   };
 
+  const isTaskExpanded = (task) =>
+    getStoredBoolean(detailExpandedByTaskId, task.task_id, false);
+
+  const isTaskOutputExpanded = (task) =>
+    getStoredBoolean(outputExpandedByTaskId, task.task_id, true);
+
+  const updateTaskExpanded = (taskId, expanded) => {
+    setDetailExpandedByTaskId((current) => {
+      const next = { ...current, [taskId]: expanded };
+      writeBooleanMap(COMPLETED_DETAIL_STORAGE_KEY, next);
+      return next;
+    });
+  };
+
+  const updateTaskOutputExpanded = (taskId, expanded) => {
+    setOutputExpandedByTaskId((current) => {
+      const next = { ...current, [taskId]: expanded };
+      writeBooleanMap(COMPLETED_OUTPUT_STORAGE_KEY, next);
+      return next;
+    });
+  };
+
+  const setAllDetailsExpanded = (expanded) => {
+    setDetailExpandedByTaskId((current) => {
+      const next = { ...current };
+      completedTasks.forEach((task) => {
+        next[task.task_id] = expanded;
+      });
+      writeBooleanMap(COMPLETED_DETAIL_STORAGE_KEY, next);
+      return next;
+    });
+  };
+
+  const setAllOutputsExpanded = (expanded) => {
+    setOutputExpandedByTaskId((current) => {
+      const next = { ...current };
+      completedTasks.forEach((task) => {
+        next[task.task_id] = expanded;
+      });
+      writeBooleanMap(COMPLETED_OUTPUT_STORAGE_KEY, next);
+      return next;
+    });
+  };
+
   const handleBulkRestart = async () => {
     await bulkRestartTasks(selectedTaskIds, addToast);
   };
@@ -268,9 +490,62 @@ export default function CompletedTasks() {
   const filteredTasks = completedTasks.filter((task) =>
     task.task_id.toLowerCase().includes(normalizedSearchQuery)
   );
+  const allDetailsExpanded =
+    completedTasks.length > 0 && completedTasks.every((task) => isTaskExpanded(task));
+  const allOutputsExpanded =
+    completedTasks.length > 0 && completedTasks.every((task) => isTaskOutputExpanded(task));
+
+  const handleOutputLineCountChange = (nextValue) => {
+    const normalized = clampLineCount(nextValue, 1, outputLineCap, defaultOutputLineCount);
+    setOutputLineCount(normalized);
+    writeStoredValue(COMPLETED_OUTPUT_LINE_COUNT_STORAGE_KEY, normalized);
+  };
+
+  const pageActions = (
+    <>
+      {lineControlEnabled ? (
+        <LineCountControl
+          label="Output Lines"
+          value={effectiveOutputLineCount}
+          min={1}
+          max={outputLineCap}
+          disabled={completedTasks.length === 0}
+          onChange={handleOutputLineCountChange}
+        />
+      ) : null}
+      <button
+        type="button"
+        className="btn btn-outline-dark page-action-btn mb-0 d-flex align-items-center gap-1"
+        disabled={completedTasks.length === 0}
+        onClick={() => setAllOutputsExpanded(!allOutputsExpanded)}
+        title={allOutputsExpanded ? "Collapse All Output" : "Expand All Output"}
+      >
+        <i className="material-icons" style={{ fontSize: "16px" }}>
+          {allOutputsExpanded ? "terminal" : "terminal"}
+        </i>
+        <span className="text-xxs text-uppercase font-weight-bolder">
+          {allOutputsExpanded ? "Hide Output" : "Show Output"}
+        </span>
+      </button>
+      <button
+        type="button"
+        className="btn btn-outline-dark page-action-btn mb-0 d-flex align-items-center gap-1"
+        disabled={completedTasks.length === 0}
+        onClick={() => setAllDetailsExpanded(!allDetailsExpanded)}
+        title={allDetailsExpanded ? "Collapse All Details" : "Expand All Details"}
+      >
+        <i className="material-icons" style={{ fontSize: "16px" }}>
+          {allDetailsExpanded ? "unfold_less" : "unfold_more"}
+        </i>
+        <span className="text-xxs text-uppercase font-weight-bolder">
+          {allDetailsExpanded ? "Hide Details" : "Show Details"}
+        </span>
+      </button>
+    </>
+  );
 
   return (
-    <Layout pageTitle="Completed Tasks">
+    <Layout pageTitle="Completed Tasks" pageActions={pageActions}>
       <div className="container-fluid py-2 completed-task-page">
         <div className="row mb-2">
           <div className="px-0 overflow-hidden completed-task-shell">
@@ -406,11 +681,18 @@ export default function CompletedTasks() {
                       isLast={idx === filteredTasks.length - 1}
                       isSelectMode={isSelectMode}
                       isSelected={selectedTaskIds.includes(task.task_id)}
+                      isExpanded={isTaskExpanded(task)}
+                      isOutputExpanded={isTaskOutputExpanded(task)}
                       onToggleSelect={toggleTaskSelection}
+                      onToggleExpanded={(taskId) => updateTaskExpanded(taskId, !isTaskExpanded(task))}
+                      onToggleOutput={(taskId) => updateTaskOutputExpanded(taskId, !isTaskOutputExpanded(task))}
                       onCopy={(task) => copyCommand(task, addToast)}
                       onRestart={(task) => restartTask(task.task_id, addToast)}
                       onDownload={(task) => downloadLog(task.task_id, addToast)}
                       onDelete={(task) => deleteTask(task.task_id, addToast)}
+                          outputLineCount={effectiveOutputLineCount}
+                        outputFetchLineCount={outputFetchLineCount}
+                        outputShellStyle={outputShellStyle}
                   />
                   ))
               )}
