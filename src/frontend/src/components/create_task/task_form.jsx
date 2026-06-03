@@ -31,17 +31,19 @@ function TaskForm({
     if (isSubmitting) return;
     setIsSubmitting(true);
 
-    // no need to flush envar saving, it'll be handled onBlur
-
-    const payload = {
-      queue_mode: queueMode,
-      task_id: taskId,
-      n_gpus: nGpus,
-      command: command,
-      envar: envar,
-    };
-
     try {
+      // Flush the editor draft first so task creation always uses the latest env values.
+      const latestEnvar = envRef.current?.saveNow ? await envRef.current.saveNow() : envar;
+      setEnvar(latestEnvar);
+
+      const payload = {
+        queue_mode: queueMode,
+        task_id: taskId,
+        n_gpus: nGpus,
+        command: command,
+        envar: latestEnvar,
+      };
+
       const response = await fetch(`${API_URL}/create_task`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
