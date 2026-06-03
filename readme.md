@@ -110,7 +110,7 @@ Field-by-field explanation:
 | `MONITORING_refresh_interval` | Hardware sampling interval in seconds. | Lower values update the dashboard more frequently but cost more polling overhead. |
 | `MONITORING_smoother_alpha` | Smoothing factor for monitoring plots. | Lower values smooth graphs more aggressively; higher values react faster to spikes. |
 | `HANDLER_pipe_to_file` | Whether subprocess output is piped into ANT log files. | Should usually stay `true`; disabling it reduces log capture fidelity. |
-| `VISUALIZER_log_max_height` | Legacy/default log height hint. | Mostly affects older visualization assumptions; modern React pages rely more on CSS and the newer line-count settings. |
+| `VISUALIZER_log_max_height` | (Unused) Legacy/default log height hint. | Mostly affects older visualization assumptions; modern React pages rely more on CSS and the newer line-count settings. |
 | `VISUALIZER_log_max_width` | Legacy/default log width hint. | Usually safe to leave as `"inf"`; rarely changed in the current UI. |
 | `VISUALIZER_terminal_win_height` | Number of live lines the backend keeps for ongoing-task terminal snapshots. | This is the effective live-output window for the Ongoing Tasks page. Raising it increases socket payload size every scheduler tick. |
 | `VISUALIZER_ongoing_output_line_control_enabled` | Shows or hides the Ongoing Tasks `Live Lines` slider and number input. | When enabled, each browser remembers its chosen live-line count in local storage. When disabled, the page uses `VISUALIZER_terminal_win_height`. |

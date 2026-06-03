@@ -18465,6 +18465,7 @@ Icon colors
   }
 
   .completed-task-output-shell {
+    padding: 0.85rem !important;
     min-height: var(--ant-output-min-height, 160px);
     max-height: var(--ant-output-max-height, 250px);
     overflow-x: auto;
