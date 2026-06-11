@@ -72,6 +72,8 @@ Current sample config:
   "MONITORING_refresh_interval": 1,
   "MONITORING_smoother_alpha": 0.1,
   "HANDLER_pipe_to_file": true,
+  "ENVVAR_slot_count": 8,
+  "ENVVAR_slot_file": "./ant_runner_logs/ant_envar_slots.json",
   "VISUALIZER_log_max_height": 20,
   "VISUALIZER_log_max_width": "inf",
   "VISUALIZER_terminal_win_height": 20,
@@ -110,6 +112,8 @@ Field-by-field explanation:
 | `MONITORING_refresh_interval` | Hardware sampling interval in seconds. | Lower values update the dashboard more frequently but cost more polling overhead. |
 | `MONITORING_smoother_alpha` | Smoothing factor for monitoring plots. | Lower values smooth graphs more aggressively; higher values react faster to spikes. |
 | `HANDLER_pipe_to_file` | Whether subprocess output is piped into ANT log files. | Should usually stay `true`; disabling it reduces log capture fidelity. |
+| `ENVVAR_slot_count` | Number of Environment Variables quick-save slots shown on the Create New Task page. | Defaults to `8`. Increasing it adds more persistent save/load cards in the slot panel. |
+| `ENVVAR_slot_file` | JSON file used to persist saved Environment Variables slots across sessions. | The Create New Task page writes slot names and variable snapshots here so they survive backend/browser restarts. |
 | `VISUALIZER_log_max_height` | (Unused) Legacy/default log height hint. | Mostly affects older visualization assumptions; modern React pages rely more on CSS and the newer line-count settings. |
 | `VISUALIZER_log_max_width` | Legacy/default log width hint. | Usually safe to leave as `"inf"`; rarely changed in the current UI. |
 | `VISUALIZER_terminal_win_height` | Number of live lines the backend keeps for ongoing-task terminal snapshots. | This is the effective live-output window for the Ongoing Tasks page. Raising it increases socket payload size every scheduler tick. |
@@ -122,11 +126,23 @@ Field-by-field explanation:
 
 Recommended tuning notes:
 
+- Queue mode on the Create New Task page now remembers the last `Single` or `Multi` selection per browser via local storage.
+- Environment Variables slots are persisted on disk through `ENVVAR_slot_file`, so saved slots survive browser refreshes and backend restarts.
 - If Completed Tasks feels heavy, lower `VISUALIZER_view_log_max_lines` first. That directly limits how much text the browser can request and render per task preview.
 - If live updates feel heavy, lower `VISUALIZER_terminal_win_height`. This reduces the number of terminal lines sent to every connected browser on each `/vis` update.
 - `VISUALIZER_completed_output_default_lines` only changes the initial Completed preview window; it is a UX default, not the hard cap.
 - `VISUALIZER_output_min_lines` and `VISUALIZER_output_max_lines` control panel height only. They do not control how many log lines are fetched or retained.
 - Changing `backend_port` or `frontend_port` usually requires restarting ANT so both child processes pick up the new values.
+
+### Environment Variable Slots
+
+The Create New Task page includes a collapsible `Environment Variable Slots` section directly below the template help.
+
+- Clicking an empty slot saves the current workspace environment variables into that slot.
+- Clicking a filled slot loads that slot back into the workspace. If the workspace already has variables, ANT asks before overwriting them.
+- Filled slots can be renamed inline so you can keep meaningful labels for later reuse.
+- Filled slots can also be cleared without affecting the current workspace variables.
+- The number of slots comes from `ENVVAR_slot_count`, and the slot contents are written to `ENVVAR_slot_file` for cross-session persistence.
 
 ### Test Run 
 Head over to the `Create New Task` tab and type the following in the `commands` box:

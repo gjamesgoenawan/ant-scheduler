@@ -13,6 +13,7 @@ from utils.misc import (handle_singular_or_plural, list2str,
                         parse_and_truncate_file, read_last_n_lines, split_commands,
                         sanitize_task_id, increment_task_id,
                         render_task_id_template)
+from utils.env_slots import EnvSlotStore
 from utils.recovery import RecoveryStore
 from utils.structures import AntTask
 
@@ -40,6 +41,7 @@ class gpu_runner(base_runner):
         self.logger = self.setup_logger(logger)
         self.loader = loader
         self.recovery_enabled = self.opt.get("RECOVERY_enabled", True)
+        self.env_slot_store = EnvSlotStore(self.opt)
         self.recovery_store = RecoveryStore(self.opt)
         loaded_recovery = self.recovery_store.load() if self.recovery_enabled else RecoveryStore.empty_history()
         self.pending_recovery = loaded_recovery if RecoveryStore.has_tasks(loaded_recovery) else RecoveryStore.empty_history()

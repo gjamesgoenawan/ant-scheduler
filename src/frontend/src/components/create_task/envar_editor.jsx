@@ -7,6 +7,11 @@ import React, {
 } from "react";
 import { API_URL } from "../../App";
 import TaskIdTemplateHelp from "./task_id_template_help";
+import { useToast } from "../layout/layout";
+import {
+  readStoredBoolean,
+  writeStoredValue,
+} from "../../utils/persistedTaskState";
 
 const ENV_VAR_PRESETS = [
   { key: "ant_task_id", value: '"[uuid]"', label: "ant_task_id", defaultLabel: "[uuid]" },
@@ -18,6 +23,62 @@ const ENV_VAR_PRESETS = [
   { key: "custom", value: "", label: "custom", defaultLabel: "manual" },
 ];
 
+const ENV_SLOT_PANEL_STORAGE_KEY = "antScheduler.createTask.envSlotsExpanded";
+
+function defaultSlotName(index) {
+  return `Slot ${index + 1}`;
+}
+
+function normalizeEnvSlotState(payload) {
+  const source = payload?.data && Array.isArray(payload.data.slots) ? payload.data : payload;
+  const rawSlots = Array.isArray(source?.slots) ? source.slots : [];
+  const rawCount = Number.isFinite(source?.slot_count) ? source.slot_count : rawSlots.length;
+  const slotCount = Math.max(0, rawCount || 0);
+
+  return {
+    slot_count: slotCount,
+    slots: Array.from({ length: slotCount }, (_, index) => {
+      const rawSlot = rawSlots[index];
+      const envar =
+        rawSlot && typeof rawSlot.envar === "object" && rawSlot.envar !== null && !Array.isArray(rawSlot.envar)
+          ? rawSlot.envar
+          : {};
+      const name = typeof rawSlot?.name === "string" && rawSlot.name.trim()
+        ? rawSlot.name.trim()
+        : defaultSlotName(index);
+
+      return {
+        index,
+        name,
+        envar,
+        saved_at: rawSlot?.saved_at ?? null,
+        is_empty: typeof rawSlot?.is_empty === "boolean" ? rawSlot.is_empty : Object.keys(envar).length === 0,
+      };
+    }),
+  };
+}
+
+function hasEnvValues(value) {
+  return !!value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length > 0;
+}
+
+function formatSlotSavedAt(savedAt) {
+  if (!savedAt) return "";
+
+  try {
+    return new Date(savedAt * 1000).toLocaleString();
+  } catch {
+    return "";
+  }
+}
+
+function summarizeSlotEnvar(envar) {
+  const keys = Object.keys(envar || {});
+  if (keys.length === 0) return "No variables saved";
+  const preview = keys.slice(0, 3).join(", ");
+  return keys.length > 3 ? `${preview} +${keys.length - 3} more` : preview;
+}
+
 function generateId() {
   return (
     Array.from(crypto.getRandomValues(new Uint8Array(8)))
@@ -27,12 +88,21 @@ function generateId() {
 }
 
 const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
+  const { addToast } = useToast();
   const [rows, setRows] = useState([]); // [{id, key, value (string)}, ...]
   const [keyErrors, setKeyErrors] = useState({}); 
   const [mode, setMode] = useState("table"); // "table" or "textarea"
   const [textValue, setTextValue] = useState(""); 
   const [textError, setTextError] = useState(null); 
   const [isPresetMenuOpen, setIsPresetMenuOpen] = useState(false);
+  const [slotState, setSlotState] = useState({ slot_count: 0, slots: [] });
+  const [slotNameDrafts, setSlotNameDrafts] = useState({});
+  const [isSlotStateLoading, setIsSlotStateLoading] = useState(true);
+  const [slotStateError, setSlotStateError] = useState(null);
+  const [activeSlotIndex, setActiveSlotIndex] = useState(null);
+  const [isSlotPanelExpanded, setIsSlotPanelExpanded] = useState(() =>
+    readStoredBoolean(ENV_SLOT_PANEL_STORAGE_KEY, true)
+  );
   const rowsRef = useRef([]);
   const textValueRef = useRef("");
   const modeRef = useRef("table");
@@ -53,6 +123,41 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
     setMode(nextMode);
   };
 
+  const applySlotState = (payload) => {
+    const normalized = normalizeEnvSlotState(payload);
+    setSlotState(normalized);
+    setSlotNameDrafts(
+      Object.fromEntries(normalized.slots.map((slot) => [slot.index, slot.name]))
+    );
+    return normalized;
+  };
+
+  const replaceEditorObject = (nextObject) => {
+    const normalizedObject =
+      nextObject && typeof nextObject === "object" && !Array.isArray(nextObject) ? nextObject : {};
+    const nextRows = objectToRows(normalizedObject);
+    updateRowsState(nextRows);
+    updateTextValueState(JSON.stringify(normalizedObject, null, 2));
+    setKeyErrors({});
+    setTextError(null);
+    return nextRows;
+  };
+
+  const requestSlotState = async (path, body = null) => {
+    const response = await fetch(`${API_URL}${path}`, {
+      method: body ? "POST" : "GET",
+      headers: body ? { "Content-Type": "application/json" } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(payload?.message || `Request failed with status ${response.status}`);
+    }
+
+    return applySlotState(payload);
+  };
+
   useEffect(() => {
     (async () => {
       try {
@@ -68,6 +173,25 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setIsSlotStateLoading(true);
+        setSlotStateError(null);
+        await requestSlotState("/get_envar_slots");
+      } catch (error) {
+        console.error("Failed to load env slots:", error);
+        setSlotStateError(String(error.message || error));
+      } finally {
+        setIsSlotStateLoading(false);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    writeStoredValue(ENV_SLOT_PANEL_STORAGE_KEY, isSlotPanelExpanded);
+  }, [isSlotPanelExpanded]);
 
   const parseLiteral = (s) => {
     if (s === "") return "";
@@ -221,6 +345,18 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
       }
       return rowsToObject(rowsRef.current);
     },
+    hasContent: () => {
+      if (modeRef.current === "textarea") {
+        const trimmed = textValueRef.current.trim();
+        return trimmed !== "" && trimmed !== "{}";
+      }
+
+      return hasEnvValues(rowsToObject(rowsRef.current));
+    },
+    replaceAll: async (nextObject) => {
+      const nextRows = replaceEditorObject(nextObject);
+      return commitSaveRows(nextRows);
+    },
   }));
 
   const handleAddPreset = (preset) => {
@@ -286,7 +422,7 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
   };
 
   const handleTextBlur = () => {
-    commitSaveFromText(textValue).catch(() => {});
+    commitSaveFromText(textValueRef.current).catch(() => {});
   };
 
   const toggleMode = () => {
@@ -320,6 +456,148 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
     (preset) => preset.key === "custom" || !existingPresetKeys.has(preset.key)
   );
 
+  const handleSlotNameChange = (index, value) => {
+    setSlotNameDrafts((current) => ({ ...current, [index]: value }));
+  };
+
+  const handleSaveSlot = async (slotIndex) => {
+    setActiveSlotIndex(slotIndex);
+    try {
+      const latestEnvar = await (modeRef.current === "textarea"
+        ? commitSaveFromText(textValueRef.current)
+        : commitSaveRows(rowsRef.current));
+
+      if (!hasEnvValues(latestEnvar)) {
+        throw new Error("No environment variables to save into a slot.");
+      }
+
+      const draftName = slotNameDrafts[slotIndex];
+      const nextState = await requestSlotState("/save_envar_slot", {
+        slot_index: slotIndex,
+        name: draftName,
+        envar: latestEnvar,
+      });
+
+      const savedSlot = nextState.slots[slotIndex];
+      addToast({
+        type: "success",
+        title: `Saved ${savedSlot.name}`,
+        autohide: true,
+        delay: 2000,
+      });
+    } catch (error) {
+      addToast({
+        type: "error",
+        title: "Failed to save slot",
+        message: String(error.message || error),
+        autohide: true,
+        delay: 3200,
+      });
+    } finally {
+      setActiveSlotIndex(null);
+    }
+  };
+
+  const handleLoadSlot = async (slot) => {
+    if (slot.is_empty) {
+      await handleSaveSlot(slot.index);
+      return;
+    }
+
+    let shouldWarn = false;
+    if (ref?.current?.hasContent) {
+      shouldWarn = ref.current.hasContent();
+    } else if (modeRef.current === "textarea") {
+      const trimmed = textValueRef.current.trim();
+      shouldWarn = trimmed !== "" && trimmed !== "{}";
+    } else {
+      shouldWarn = hasEnvValues(rowsToObject(rowsRef.current));
+    }
+
+    if (shouldWarn) {
+      const shouldOverwrite = window.confirm(
+        `Current Environment Variables already contain values. Overwrite them with \"${slot.name}\"?`
+      );
+      if (!shouldOverwrite) return;
+    }
+
+    setActiveSlotIndex(slot.index);
+    try {
+      await ref.current.replaceAll(slot.envar);
+      addToast({
+        type: "success",
+        title: `Loaded ${slot.name}`,
+        autohide: true,
+        delay: 2000,
+      });
+    } catch (error) {
+      addToast({
+        type: "error",
+        title: "Failed to load slot",
+        message: String(error.message || error),
+        autohide: true,
+        delay: 3200,
+      });
+    } finally {
+      setActiveSlotIndex(null);
+    }
+  };
+
+  const handleRenameSlot = async (slot) => {
+    setActiveSlotIndex(slot.index);
+    try {
+      const nextState = await requestSlotState("/rename_envar_slot", {
+        slot_index: slot.index,
+        name: slotNameDrafts[slot.index],
+      });
+      const renamedSlot = nextState.slots[slot.index];
+      addToast({
+        type: "success",
+        title: `Renamed to ${renamedSlot.name}`,
+        autohide: true,
+        delay: 1800,
+      });
+    } catch (error) {
+      addToast({
+        type: "error",
+        title: "Failed to rename slot",
+        message: String(error.message || error),
+        autohide: true,
+        delay: 3200,
+      });
+    } finally {
+      setActiveSlotIndex(null);
+    }
+  };
+
+  const handleClearSlot = async (slot) => {
+    const shouldClear = window.confirm(`Clear saved variables in \"${slot.name}\"?`);
+    if (!shouldClear) return;
+
+    setActiveSlotIndex(slot.index);
+    try {
+      await requestSlotState("/clear_envar_slot", {
+        slot_index: slot.index,
+      });
+      addToast({
+        type: "success",
+        title: `Cleared ${slot.name}`,
+        autohide: true,
+        delay: 1800,
+      });
+    } catch (error) {
+      addToast({
+        type: "error",
+        title: "Failed to clear slot",
+        message: String(error.message || error),
+        autohide: true,
+        delay: 3200,
+      });
+    } finally {
+      setActiveSlotIndex(null);
+    }
+  };
+
   return (
     <div className="">
       <div className="d-flex justify-content-between align-items-center">
@@ -346,6 +624,125 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
           compact={true}
           storageKey="antScheduler.createTask.envTaskIdTemplateHelpExpanded"
         />
+      </div>
+
+      <div
+        className={`task-id-template-help task-id-template-help-compact env-slot-panel ${
+          isSlotPanelExpanded ? "" : "task-id-template-help-collapsed"
+        }`}
+      >
+        <button
+          type="button"
+          className="task-id-template-help-header"
+          onClick={() => setIsSlotPanelExpanded((current) => !current)}
+          aria-expanded={isSlotPanelExpanded}
+        >
+          <span className="task-id-template-help-title">Environment Variable Slots</span>
+          <span className="task-id-template-help-toggle">
+            <i className="material-icons text-sm">{isSlotPanelExpanded ? "expand_less" : "expand_more"}</i>
+          </span>
+        </button>
+
+        {isSlotPanelExpanded ? (
+          <div className="task-id-template-help-body">
+            <p className="task-id-template-help-copy mb-0">
+              Click an empty slot to save the current workspace variables. Click a saved slot to load it into the workspace.
+            </p>
+
+            {isSlotStateLoading ? (
+              <div className="env-slot-empty-state">Loading saved slots...</div>
+            ) : slotStateError ? (
+              <div className="env-slot-empty-state text-danger">{slotStateError}</div>
+            ) : (
+              <div className="env-slot-grid">
+                {slotState.slots.map((slot) => {
+                  const slotBusy = activeSlotIndex === slot.index;
+                  const slotSavedAt = formatSlotSavedAt(slot.saved_at);
+
+                  return (
+                    <div
+                      key={slot.index}
+                      role="button"
+                      tabIndex={0}
+                      className={`env-slot-card ${slot.is_empty ? "env-slot-card-empty" : "env-slot-card-filled"} ${
+                        slotBusy ? "env-slot-card-busy" : ""
+                      }`}
+                      onClick={() => handleLoadSlot(slot)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          handleLoadSlot(slot);
+                        }
+                      }}
+                    >
+                      <div className="env-slot-card-top">
+                        <span className="env-slot-badge">#{slot.index + 1}</span>
+                        {slot.is_empty ? (
+                          <span className="env-slot-status">Empty</span>
+                        ) : (
+                          <span className="env-slot-status">Saved</span>
+                        )}
+                      </div>
+
+                      {slot.is_empty ? (
+                        <div className="env-slot-empty-copy">
+                          <i className="material-icons">add_circle_outline</i>
+                          <span>Save current variables</span>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="env-slot-name-row" onClick={(event) => event.stopPropagation()}>
+                            <input
+                              type="text"
+                              className="form-control env-slot-name-input"
+                              value={slotNameDrafts[slot.index] ?? slot.name}
+                              onChange={(event) => handleSlotNameChange(slot.index, event.target.value)}
+                              onBlur={() => handleRenameSlot(slot)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  handleRenameSlot(slot);
+                                }
+                              }}
+                              disabled={slotBusy}
+                            />
+                          </div>
+
+                          <div className="env-slot-summary">{summarizeSlotEnvar(slot.envar)}</div>
+                          <div className="env-slot-meta">
+                            {Object.keys(slot.envar || {}).length} variable(s)
+                            {slotSavedAt ? ` | Saved ${slotSavedAt}` : ""}
+                          </div>
+
+                          <div className="env-slot-actions" onClick={(event) => event.stopPropagation()}>
+                            <button
+                              type="button"
+                              className="btn btn-link env-slot-action-btn"
+                              onClick={() => handleRenameSlot(slot)}
+                              disabled={slotBusy}
+                              title="Save Slot Name"
+                            >
+                              <i className="material-icons text-sm">save</i>
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-link env-slot-action-btn text-danger"
+                              onClick={() => handleClearSlot(slot)}
+                              disabled={slotBusy}
+                              title="Clear Slot"
+                            >
+                              <i className="material-icons text-sm">delete_outline</i>
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : null}
       </div>
 
       <div className="">

@@ -252,6 +252,62 @@ def save_env_route():
     r.loader.update_envar(envar)
     return jsonify({"status": "success"})
 
+@app.route("/get_envar_slots", methods=["GET"])
+def get_envar_slots():
+    with runner_lock:
+        return jsonify(r.env_slot_store.get_slots())
+
+@app.route("/save_envar_slot", methods=["POST"])
+def save_envar_slot():
+    body = request.get_json(force=True) or {}
+    slot_index = body.get("slot_index")
+    envar = body.get("envar", {})
+    name = body.get("name")
+
+    if slot_index is None:
+        return jsonify({"status": "error", "message": "slot_index is required"}), 400
+
+    try:
+        with runner_lock:
+            state = r.env_slot_store.save_slot(int(slot_index), envar, name=name)
+    except Exception as error:
+        return jsonify({"status": "error", "message": str(error)}), 400
+
+    return jsonify({"status": "success", "data": state})
+
+@app.route("/rename_envar_slot", methods=["POST"])
+def rename_envar_slot():
+    body = request.get_json(force=True) or {}
+    slot_index = body.get("slot_index")
+    name = body.get("name")
+
+    if slot_index is None:
+        return jsonify({"status": "error", "message": "slot_index is required"}), 400
+
+    try:
+        with runner_lock:
+            state = r.env_slot_store.rename_slot(int(slot_index), name=name)
+    except Exception as error:
+        return jsonify({"status": "error", "message": str(error)}), 400
+
+    return jsonify({"status": "success", "data": state})
+
+@app.route("/clear_envar_slot", methods=["POST"])
+def clear_envar_slot():
+    body = request.get_json(force=True) or {}
+    slot_index = body.get("slot_index")
+
+    if slot_index is None:
+        return jsonify({"status": "error", "message": "slot_index is required"}), 400
+
+    try:
+        with runner_lock:
+            state = r.env_slot_store.clear_slot(int(slot_index))
+    except Exception as error:
+        return jsonify({"status": "error", "message": str(error)}), 400
+
+    return jsonify({"status": "success", "data": state})
+
 def emit_vis_data():
     """Emit /vis data every 1 second to all connected clients"""
     while True:

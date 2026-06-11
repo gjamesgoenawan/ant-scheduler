@@ -23,10 +23,13 @@
     "ADGS_mem_threshold": 0.5,
 
     "MONITORING_history_size": 300,
-    "MONITORING_refresh_interval": 2,
+    "MONITORING_refresh_interval": 1,
     "MONITORING_smoother_alpha": 0.1,
 
     "HANDLER_pipe_to_file": true,
+
+    "ENVVAR_slot_count": 8,
+    "ENVVAR_slot_file": "./ant_runner_logs/ant_envar_slots.json",
 
     "VISUALIZER_log_max_height": 40,
     "VISUALIZER_log_max_width": "inf",

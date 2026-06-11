@@ -6,6 +6,23 @@ import QueuedTaskList from "../components/create_task/queued_task";
 import TaskForm from "../components/create_task/task_form";
 import TaskStatus from "../components/statistics/task_status";
 import GpuToggleList from "../components/statistics/gpu_toggle";
+import { writeStoredValue } from "../utils/persistedTaskState";
+
+const CREATE_TASK_QUEUE_MODE_STORAGE_KEY = "antScheduler.createTask.queueMode";
+
+function readStoredQueueMode() {
+  if (typeof window === "undefined") return "Single";
+
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(CREATE_TASK_QUEUE_MODE_STORAGE_KEY) || '"Single"'
+    );
+    return parsed === "Multi" ? "Multi" : "Single";
+  } catch (error) {
+    console.warn("Failed to read create-task queue mode from localStorage", error);
+    return "Single";
+  }
+}
 
 function generateUUID64() {
   return Array.from(crypto.getRandomValues(new Uint8Array(16)))
@@ -15,7 +32,7 @@ function generateUUID64() {
 
 export default function CreateTask() {
   const { data } = useMonitorData();
-  const [queueMode, setQueueMode] = useState("Single");
+  const [queueMode, setQueueMode] = useState(() => readStoredQueueMode());
   const [taskId, setTaskId] = useState(generateUUID64() || "");
   const [nGpus, setNGpus] = useState(1);
   const [gpuOptions, setGpuOptions] = useState([]);
@@ -31,6 +48,10 @@ export default function CreateTask() {
       setQueuedTasks(data.task_queue || []);
     }
   }, [data]);
+
+  useEffect(() => {
+    writeStoredValue(CREATE_TASK_QUEUE_MODE_STORAGE_KEY, queueMode);
+  }, [queueMode]);
 
   const showCreateErrorToast = (msg) => {
   const text = Array.isArray(msg) ? msg.join("\n") : String(msg || "");

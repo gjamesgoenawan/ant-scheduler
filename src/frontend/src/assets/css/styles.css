@@ -18859,6 +18859,154 @@ Icon colors
     color: #94a3b8;
   }
 
+  .env-slot-panel {
+    margin-top: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .env-slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 0.7rem;
+    margin-top: 0.75rem;
+  }
+
+  .env-slot-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    min-height: 132px;
+    padding: 0.8rem;
+    border: 1px solid rgba(203, 213, 225, 0.9);
+    border-radius: 0.85rem;
+    background: #fff;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  }
+
+  .env-slot-card:hover {
+    border-color: rgba(99, 102, 241, 0.45);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    transform: translateY(-1px);
+  }
+
+  .env-slot-card-busy {
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  .env-slot-card-empty {
+    background: linear-gradient(180deg, rgba(248, 250, 252, 0.96), rgba(241, 245, 249, 0.96));
+    border-style: dashed;
+  }
+
+  .env-slot-card-filled {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 1), rgba(248, 250, 252, 0.92));
+  }
+
+  .env-slot-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.6rem;
+  }
+
+  .env-slot-badge,
+  .env-slot-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 0.18rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .env-slot-badge {
+    background: rgba(226, 232, 240, 0.95);
+    color: #334155;
+  }
+
+  .env-slot-status {
+    background: rgba(224, 231, 255, 0.92);
+    color: #4338ca;
+  }
+
+  .env-slot-empty-copy {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    color: #64748b;
+    text-align: center;
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+
+  .env-slot-empty-copy .material-icons {
+    font-size: 1.4rem;
+  }
+
+  .env-slot-name-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+  }
+
+  .env-slot-name-input {
+    min-height: 34px;
+    padding: 0.38rem 0.6rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  .env-slot-summary {
+    font-family: var(--bs-font-monospace);
+    font-size: 0.75rem;
+    line-height: 1.35;
+    color: #334155;
+    overflow-wrap: anywhere;
+  }
+
+  .env-slot-meta {
+    font-size: 0.72rem;
+    color: #64748b;
+    line-height: 1.35;
+  }
+
+  .env-slot-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.1rem;
+    margin-top: auto;
+  }
+
+  .env-slot-action-btn {
+    min-height: 30px;
+    padding: 0.15rem 0.35rem !important;
+    color: #475569 !important;
+  }
+
+  .env-slot-action-btn:hover {
+    color: #0f172a !important;
+  }
+
+  .env-slot-empty-state {
+    margin-top: 0.75rem;
+    padding: 0.85rem;
+    border: 1px dashed rgba(203, 213, 225, 0.95);
+    border-radius: 0.75rem;
+    color: #64748b;
+    text-align: center;
+    font-size: 0.8rem;
+  }
+
   .completed-task-toolbar-status {
     flex: 0 0 auto !important;
     min-width: 0 !important;
@@ -20072,6 +20220,15 @@ Icon colors
 
     .task-id-template-help-copy {
       font-size: 0.78rem;
+    }
+
+    .env-slot-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .env-slot-card {
+      min-height: 118px;
+      padding: 0.72rem;
     }
 
     .task-id-template-token {
