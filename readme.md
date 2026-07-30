@@ -38,7 +38,7 @@ python run.py [gpu_ids separated by comma]
 # Example (Selecting the first 4 GPUs):
 python run.py  0,1,2,3
 ```
-By default, this will load the configuration from `config/default.json` and host a web interface at `https://0.0.0.0:6060`. The backend status can be checked by curling as follows:
+By default, this will load the configuration from `config/default.json` and host a web interface at `https://0.0.0.0:6060`. Set `FRONTEND_protocol` to `http` when TLS is not required. The backend status can be checked by curling as follows:
 ```
 curl --insecure https://0.0.0.0:6060/api/
 ```
@@ -52,6 +52,7 @@ Current sample config:
 {
   "backend_port": 5000,
   "frontend_port": 6060,
+  "FRONTEND_protocol": "https",
   "step_interval": 1,
   "logger": "default_logger",
   "loader": "memory_loader",
@@ -91,7 +92,8 @@ Field-by-field explanation:
 | Key | Meaning | Practical effect |
 | - | - | - |
 | `backend_port` | HTTP port used by the Flask/Eventlet backend API. | The frontend proxy forwards `/api/*` requests to this port. Change this if port `5000` is occupied. |
-| `frontend_port` | HTTPS port used by the Quart/Hypercorn frontend server. | This is the browser entrypoint you open, typically `https://host:6060`. |
+| `frontend_port` | Port used by the Quart/Hypercorn frontend server. | This is the browser entrypoint you open, typically `https://host:6060`. |
+| `FRONTEND_protocol` | Protocol used by the Quart/Hypercorn frontend server. | Set to `https` (default) to load `cert.pem`/`key.pem` from `--cert_path`, or set to `http` to serve the same port without TLS. |
 | `step_interval` | Main scheduler loop interval in seconds. | Controls how often ANT advances the scheduler, refreshes live status, and emits UI updates. Lower values feel more real-time but cost more CPU. |
 | `logger` | Logger backend implementation name. | Usually left as `default_logger` unless you are extending ANT internals. |
 | `loader` | Loader implementation name. | `memory_loader` keeps queue/env state in memory instead of a database or external store. |
@@ -132,7 +134,7 @@ Recommended tuning notes:
 - If live updates feel heavy, lower `VISUALIZER_terminal_win_height`. This reduces the number of terminal lines sent to every connected browser on each `/vis` update.
 - `VISUALIZER_completed_output_default_lines` only changes the initial Completed preview window; it is a UX default, not the hard cap.
 - `VISUALIZER_output_min_lines` and `VISUALIZER_output_max_lines` control panel height only. They do not control how many log lines are fetched or retained.
-- Changing `backend_port` or `frontend_port` usually requires restarting ANT so both child processes pick up the new values.
+- Changing `backend_port`, `frontend_port`, or `FRONTEND_protocol` requires restarting ANT so both child processes pick up the new values. When `FRONTEND_protocol` is `http`, access the UI as `http://host:6060` and do not use `curl --insecure`.
 
 ### Environment Variable Slots
 

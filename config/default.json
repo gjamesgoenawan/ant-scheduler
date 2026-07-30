@@ -1,6 +1,7 @@
 {   
     "backend_port": 5000,
     "frontend_port": 6060,
+    "FRONTEND_protocol": "http",
     "step_interval": 1,
     "logger": "default_logger",
     "loader": "memory_loader",

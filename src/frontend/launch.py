@@ -203,14 +203,18 @@ if __name__ == "__main__":
         opt = json.load(f)
 
     BACKEND_URL = f"http://localhost:{opt['backend_port']}"
+    frontend_protocol = str(opt.get("FRONTEND_protocol", "https")).strip().lower()
+    if frontend_protocol not in {"http", "https"}:
+        raise ValueError("FRONTEND_protocol must be either 'http' or 'https'")
 
     # Hypercorn config
     config = Config()
     config.accesslog = None 
     config.bind = [f"0.0.0.0:{opt['frontend_port']}"] 
-    config.certfile = os.path.join(args.cert_path, "cert.pem")
-    config.keyfile = os.path.join(args.cert_path, "key.pem")
+    if frontend_protocol == "https":
+        config.certfile = os.path.join(args.cert_path, "cert.pem")
+        config.keyfile = os.path.join(args.cert_path, "key.pem")
 
-    print(f"Running frontend at https://0.0.0.0:{opt['frontend_port']}")
+    print(f"Running frontend at {frontend_protocol}://0.0.0.0:{opt['frontend_port']}")
     
     asyncio.run(run_frontend_server(config))
