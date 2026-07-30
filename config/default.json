@@ -32,6 +32,10 @@
     "ENVVAR_slot_count": 8,
     "ENVVAR_slot_file": "./ant_runner_logs/ant_envar_slots.json",
 
+    "TERMINAL_enabled": true,
+    "TERMINAL_shell": "/bin/bash",
+    "TERMINAL_working_directory": "~",
+
     "VISUALIZER_log_max_height": 40,
     "VISUALIZER_log_max_width": "inf",
     "VISUALIZER_terminal_win_height": 40,

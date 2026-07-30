@@ -1,8 +1,29 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import logo from "/img/logo-ct.png"; // Copy your logo here
 
 export default function Sidebar({ pinned }) {
+  const [terminalEnabled, setTerminalEnabled] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/terminal/config")
+      .then((response) => {
+        if (!response.ok) throw new Error(`Terminal config returned ${response.status}`);
+        return response.json();
+      })
+      .then((config) => {
+        if (!cancelled) setTerminalEnabled(config?.enabled === true);
+      })
+      .catch(() => {
+        // Keep the configured navigation available through transient API failures.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <aside
       className="sidenav navbar navbar-vertical navbar-expand-xs border-0 border-radius-xl my-3 fixed-start ms-3 bg-gradient-dark"
@@ -22,11 +43,9 @@ export default function Sidebar({ pinned }) {
 
       <hr className="horizontal light mt-0 mb-2" />
 
-      <div className="collapse navbar-collapse w-auto" id="sidenav-collapse-main"
-        style = {{ minHeight: "min(200px, 50vh)" }}
-      >
+      <div className="collapse navbar-collapse w-auto ant-sidebar-nav-shell" id="sidenav-collapse-main">
 
-        <ul className="navbar-nav">
+        <ul className="navbar-nav ant-sidebar-nav">
           <li className="nav-item">
             <NavLink
               to="/home"
@@ -82,6 +101,22 @@ export default function Sidebar({ pinned }) {
               <span className="nav-link-text ms-1">Create New Task</span>
             </NavLink>
           </li>
+
+          {terminalEnabled ? (
+            <li className="nav-item ant-sidebar-terminal-item">
+              <NavLink
+                to="/terminal"
+                className={({ isActive }) =>
+                  "nav-link text-white" + (isActive ? " active bg-gradient-primary" : "")
+                }
+              >
+                <div className="text-white text-center me-2 d-flex align-items-center justify-content-center">
+                  <i className="material-icons opacity-10">terminal</i>
+                </div>
+                <span className="nav-link-text ms-1">Terminal</span>
+              </NavLink>
+            </li>
+          ) : null}
         </ul>
       </div>
     </aside>

@@ -1,8 +1,16 @@
 import argparse
 import asyncio
+import contextlib
+import fcntl
 import json
 import logging
 import os
+import pty
+import signal
+import struct
+import subprocess
+import termios
+from urllib.parse import urlparse
 
 import httpx
 import websockets
@@ -173,6 +181,123 @@ async def completed_task_page():
 async def logs():
     return await send_from_directory(app.static_folder, "index.html")
 
+@app.route("/terminal")
+@app.route("/terminal/")
+async def terminal():
+    return await send_from_directory(app.static_folder, "index.html")
+
+@app.route("/terminal/config")
+async def terminal_config():
+    return {"enabled": TERMINAL_ENABLED}
+
+def resize_terminal(master_fd, rows, cols):
+    normalized_rows = max(1, min(int(rows), 1000))
+    normalized_cols = max(1, min(int(cols), 1000))
+    window_size = struct.pack("HHHH", normalized_rows, normalized_cols, 0, 0)
+    fcntl.ioctl(master_fd, termios.TIOCSWINSZ, window_size)
+
+@app.websocket("/terminal/ws")
+async def terminal_ws():
+    if not TERMINAL_ENABLED:
+        await websocket.close(1008)
+        return
+
+    origin = websocket.headers.get("origin")
+    request_host = websocket.headers.get("host")
+    if origin and urlparse(origin).netloc != request_host:
+        logger.warning("Rejected cross-origin terminal websocket from %s", origin)
+        await websocket.close(1008)
+        return
+
+    master_fd, slave_fd = pty.openpty()
+    process = None
+    loop = asyncio.get_running_loop()
+    output_queue = asyncio.Queue()
+
+    try:
+        terminal_env = os.environ.copy()
+        terminal_env.update({"TERM": "xterm-256color", "COLORTERM": "truecolor"})
+        process = subprocess.Popen(
+            [TERMINAL_SHELL, "-l"],
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            cwd=TERMINAL_WORKING_DIRECTORY,
+            env=terminal_env,
+            start_new_session=True,
+            close_fds=True,
+        )
+        os.close(slave_fd)
+        slave_fd = -1
+
+        def read_pty_output():
+            try:
+                data = os.read(master_fd, 65536)
+                if data:
+                    output_queue.put_nowait(data)
+                else:
+                    output_queue.put_nowait(None)
+            except OSError:
+                output_queue.put_nowait(None)
+
+        loop.add_reader(master_fd, read_pty_output)
+
+        async def send_output():
+            while True:
+                data = await output_queue.get()
+                if data is None:
+                    return
+                await websocket.send(data)
+
+        async def receive_input():
+            while True:
+                message = await websocket.receive()
+                if isinstance(message, bytes):
+                    os.write(master_fd, message)
+                    continue
+
+                payload = json.loads(message)
+                message_type = payload.get("type")
+                if message_type == "input":
+                    os.write(master_fd, str(payload.get("data", "")).encode())
+                elif message_type == "resize":
+                    resize_terminal(master_fd, payload.get("rows", 24), payload.get("cols", 80))
+                elif message_type == "heartbeat":
+                    await websocket.send(b"")
+
+        send_task = asyncio.create_task(send_output())
+        receive_task = asyncio.create_task(receive_input())
+        process_task = asyncio.create_task(asyncio.to_thread(process.wait))
+        done, pending = await asyncio.wait(
+            [send_task, receive_task, process_task],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+        for task in done:
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                task.result()
+    except Exception:
+        logger.exception("terminal websocket error")
+    finally:
+        with contextlib.suppress(Exception):
+            loop.remove_reader(master_fd)
+        if slave_fd >= 0:
+            with contextlib.suppress(OSError):
+                os.close(slave_fd)
+        with contextlib.suppress(OSError):
+            os.close(master_fd)
+        if process is not None and process.poll() is None:
+            with contextlib.suppress(ProcessLookupError):
+                os.killpg(process.pid, signal.SIGTERM)
+            try:
+                await asyncio.wait_for(asyncio.to_thread(process.wait), timeout=1.5)
+            except asyncio.TimeoutError:
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(process.pid, signal.SIGKILL)
+
 @app.route("/404")
 async def notfound():
     return await send_from_directory(app.static_folder, "index.html")
@@ -203,6 +328,17 @@ if __name__ == "__main__":
         opt = json.load(f)
 
     BACKEND_URL = f"http://localhost:{opt['backend_port']}"
+    TERMINAL_ENABLED = bool(opt.get("TERMINAL_enabled", True))
+    TERMINAL_SHELL = os.path.expanduser(str(opt.get("TERMINAL_shell", os.environ.get("SHELL", "/bin/bash"))))
+    TERMINAL_WORKING_DIRECTORY = os.path.abspath(
+        os.path.expanduser(str(opt.get("TERMINAL_working_directory", "~")))
+    )
+    if TERMINAL_ENABLED and not os.path.isfile(TERMINAL_SHELL):
+        raise ValueError(f"TERMINAL_shell does not exist: {TERMINAL_SHELL}")
+    if TERMINAL_ENABLED and not os.path.isdir(TERMINAL_WORKING_DIRECTORY):
+        raise ValueError(
+            f"TERMINAL_working_directory does not exist: {TERMINAL_WORKING_DIRECTORY}"
+        )
     frontend_protocol = str(opt.get("FRONTEND_protocol", "https")).strip().lower()
     if frontend_protocol not in {"http", "https"}:
         raise ValueError("FRONTEND_protocol must be either 'http' or 'https'")

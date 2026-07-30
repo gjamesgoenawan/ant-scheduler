@@ -1,5 +1,5 @@
-import { useEffect, useState, createContext, useContext } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { lazy, Suspense, useEffect, useState, createContext, useContext } from "react";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { io } from "socket.io-client";
 
 import * as bootstrap from 'bootstrap';
@@ -13,6 +13,8 @@ import CreateTask from "./pages/create_task";
 import Logs from "./pages/logs";
 import NotFound from "./pages/404";
 import TaskRecoveryModal from "./components/recovery/task_recovery_modal";
+
+const TerminalPage = lazy(() => import("./pages/terminal"));
 
 const DataContext = createContext(null);
 
@@ -33,6 +35,9 @@ const socket = io(SOCKETIO_URL, {
 
 function App() {
   const [data, setData] = useState(null);
+  const location = useLocation();
+  const terminalActive = location.pathname === "/terminal";
+  const [terminalVisited, setTerminalVisited] = useState(terminalActive);
 
   if (typeof window !== 'undefined') {
     window.bootstrap = bootstrap;
@@ -53,21 +58,35 @@ function App() {
       socket.off("update_vis_data", handleUpdate);
     };
   }, []);
+
+  useEffect(() => {
+    if (terminalActive) setTerminalVisited(true);
+  }, [terminalActive]);
   
   
   return (
     <ToastProvider maxToasts={2}>
     <DataContext.Provider value={{ data, socket }}>
-      <Routes>
-        <Route path="/" element={<Navigate to="/home" />} />
-        <Route path="/home" element={<Home />} />
-        <Route path="/ongoing_task" element={<OngoingTask />} />
-        <Route path="/completed_task" element={<CompletedTask />} />
-        <Route path="/create_task" element={<CreateTask />} />
-        <Route path="/logs" element={<Logs />} />
-        <Route path="*" element={<Navigate to="/404" />} />
-        <Route path="/404" element={<NotFound />} />
-      </Routes>
+      <div hidden={terminalActive}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/home" />} />
+          <Route path="/home" element={<Home />} />
+          <Route path="/ongoing_task" element={<OngoingTask />} />
+          <Route path="/completed_task" element={<CompletedTask />} />
+          <Route path="/create_task" element={<CreateTask />} />
+          <Route path="/logs" element={<Logs />} />
+          <Route path="/terminal" element={null} />
+          <Route path="*" element={<Navigate to="/404" />} />
+          <Route path="/404" element={<NotFound />} />
+        </Routes>
+      </div>
+      {terminalVisited ? (
+        <div hidden={!terminalActive}>
+          <Suspense fallback={<div className="p-4 text-secondary">Loading terminal...</div>}>
+            <TerminalPage active={terminalActive} />
+          </Suspense>
+        </div>
+      ) : null}
       <TaskRecoveryModal />
     </DataContext.Provider>
     </ToastProvider>

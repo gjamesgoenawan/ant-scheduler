@@ -1,15 +1,17 @@
 import React from "react";
 
-export default function Navbar({ pageTitle, toggleSidebar, actions = null }) {
+export default function Navbar({ pageTitle, toggleSidebar, actions = null, hideTitle = false }) {
   return (
     <nav
-      className="navbar navbar-main navbar-expand-lg px-0 mx-0 shadow-none border-radius-xl"
+      className={`navbar navbar-main navbar-expand-lg px-0 mx-0 shadow-none border-radius-xl ${hideTitle ? "terminal-compact-navbar" : ""}`}
       id="navbarBlur"
     >
       <div className="container-fluid py-1 px-0 navbar-page-bar">
-        <nav aria-label="breadcrumb" className="navbar-page-title">
-          <h4 className="font-weight-bolder mb-0 mt-4">{pageTitle}</h4>
-        </nav>
+        {hideTitle ? null : (
+          <nav aria-label="breadcrumb" className="navbar-page-title">
+            <h4 className="font-weight-bolder mb-0 mt-4">{pageTitle}</h4>
+          </nav>
+        )}
 
         <div className="navbar-page-actions">
           {actions ? <div className="navbar-page-action-group">{actions}</div> : null}

@@ -19007,6 +19007,217 @@ Icon colors
     font-size: 0.8rem;
   }
 
+  .ant-sidebar-nav-shell {
+    height: calc(100vh - 118px) !important;
+    min-height: 240px;
+  }
+
+  .ant-sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100%;
+  }
+
+  .ant-sidebar-terminal-item {
+    margin-top: auto;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .terminal-page {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 1rem 0;
+  }
+
+  .app-shell-compact {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    min-height: 0 !important;
+    overflow: hidden;
+  }
+
+  .app-shell-compact .navbar-main {
+    flex: 0 0 auto;
+    min-height: 0;
+  }
+
+  @media (min-width: 1200px) {
+    .app-shell-compact .terminal-compact-navbar {
+      display: none;
+    }
+  }
+
+  .app-shell-compact .navbar-page-bar {
+    min-height: 0;
+  }
+
+  .terminal-workspace {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+    border: 1px solid rgba(203, 213, 225, 0.95);
+    border-radius: 0.75rem;
+    background: #fff;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+  }
+
+  .terminal-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 58px;
+    padding: 0.65rem 0.8rem;
+    border-bottom: 1px solid rgba(203, 213, 225, 0.9);
+    background: #f8fafc;
+  }
+
+  .terminal-toolbar-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex: 0 0 auto;
+    color: #475569;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .terminal-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #94a3b8;
+    box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.16);
+  }
+
+  .terminal-status-connected {
+    background: #16a34a;
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.14);
+  }
+
+  .terminal-status-error,
+  .terminal-status-disconnected {
+    background: #dc2626;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.14);
+  }
+
+  .terminal-toolbar-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.65rem;
+    min-width: 0;
+  }
+
+  .terminal-font-control {
+    display: grid;
+    grid-template-columns: auto minmax(92px, 140px) 40px;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0;
+    color: #475569;
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+
+  .terminal-font-control input {
+    width: 100%;
+    accent-color: #2563eb;
+  }
+
+  .terminal-font-control output {
+    color: #334155;
+    text-align: right;
+    font-family: var(--bs-font-monospace);
+    font-size: 0.7rem;
+  }
+
+  .terminal-theme-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.2rem;
+    border: 1px solid rgba(203, 213, 225, 0.9);
+    border-radius: 0.55rem;
+    background: #fff;
+  }
+
+  .terminal-theme-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 30px;
+    padding: 0.25rem 0.45rem;
+    border: 0;
+    border-radius: 0.38rem;
+    background: transparent;
+    color: #64748b;
+    font-size: 0.68rem;
+    font-weight: 700;
+  }
+
+  .terminal-theme-button:hover,
+  .terminal-theme-button-active {
+    background: #e2e8f0;
+    color: #0f172a;
+  }
+
+  .terminal-theme-swatch {
+    width: 12px;
+    height: 12px;
+    border: 1px solid rgba(100, 116, 139, 0.45);
+    border-radius: 3px;
+  }
+
+  .terminal-new-session-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 34px;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.68rem;
+  }
+
+  .terminal-new-session-btn .material-icons {
+    font-size: 1rem;
+  }
+
+  .terminal-stage {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0.75rem;
+    transition: background-color 0.15s ease;
+  }
+
+  .terminal-host {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .terminal-host .xterm {
+    height: 100%;
+    background-color: inherit !important;
+  }
+
+  .terminal-host .xterm-screen,
+  .terminal-host .xterm-viewport,
+  .terminal-host .xterm-scrollable-element {
+    background-color: inherit !important;
+  }
+
+  .terminal-host .xterm-viewport {
+    scrollbar-color: rgba(148, 163, 184, 0.55) transparent;
+    scrollbar-width: thin;
+  }
+
   .completed-task-toolbar-status {
     flex: 0 0 auto !important;
     min-width: 0 !important;
@@ -20229,6 +20440,46 @@ Icon colors
     .env-slot-card {
       min-height: 118px;
       padding: 0.72rem;
+    }
+
+    .terminal-page.container-fluid {
+      padding-left: 0.6rem !important;
+      padding-right: 0.6rem !important;
+      padding-top: 0.75rem !important;
+    }
+
+    .terminal-toolbar {
+      align-items: flex-start;
+      flex-direction: column;
+      padding: 0.65rem;
+    }
+
+    .terminal-toolbar-controls {
+      width: 100%;
+      justify-content: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .terminal-font-control {
+      flex: 1 1 200px;
+      grid-template-columns: auto minmax(90px, 1fr) 40px;
+    }
+
+    .terminal-theme-control {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    .terminal-theme-button {
+      flex: 0 0 auto;
+    }
+
+    .terminal-stage {
+      padding: 0.55rem;
+    }
+
+    .terminal-host {
+      min-height: 0;
     }
 
     .task-id-template-token {

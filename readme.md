@@ -75,6 +75,9 @@ Current sample config:
   "HANDLER_pipe_to_file": true,
   "ENVVAR_slot_count": 8,
   "ENVVAR_slot_file": "./ant_runner_logs/ant_envar_slots.json",
+  "TERMINAL_enabled": true,
+  "TERMINAL_shell": "/bin/bash",
+  "TERMINAL_working_directory": "~",
   "VISUALIZER_log_max_height": 20,
   "VISUALIZER_log_max_width": "inf",
   "VISUALIZER_terminal_win_height": 20,
@@ -116,6 +119,9 @@ Field-by-field explanation:
 | `HANDLER_pipe_to_file` | Whether subprocess output is piped into ANT log files. | Should usually stay `true`; disabling it reduces log capture fidelity. |
 | `ENVVAR_slot_count` | Number of Environment Variables quick-save slots shown on the Create New Task page. | Defaults to `8`. Increasing it adds more persistent save/load cards in the slot panel. |
 | `ENVVAR_slot_file` | JSON file used to persist saved Environment Variables slots across sessions. | The Create New Task page writes slot names and variable snapshots here so they survive backend/browser restarts. |
+| `TERMINAL_enabled` | Enables the browser-based interactive shell. | When `true`, the sidebar shows Terminal and the frontend accepts PTY WebSocket sessions. Set to `false` if the ANT web interface is exposed to users who should not receive shell access. |
+| `TERMINAL_shell` | Login shell executable launched for each web terminal session. | Defaults to `/bin/bash`. The path must exist on the ANT host. |
+| `TERMINAL_working_directory` | Initial working directory for new terminal sessions. | Defaults to `~`, which expands to the account home directory running ANT. |
 | `VISUALIZER_log_max_height` | (Unused) Legacy/default log height hint. | Mostly affects older visualization assumptions; modern React pages rely more on CSS and the newer line-count settings. |
 | `VISUALIZER_log_max_width` | Legacy/default log width hint. | Usually safe to leave as `"inf"`; rarely changed in the current UI. |
 | `VISUALIZER_terminal_win_height` | Number of live lines the backend keeps for ongoing-task terminal snapshots. | This is the effective live-output window for the Ongoing Tasks page. Raising it increases socket payload size every scheduler tick. |
@@ -145,6 +151,17 @@ The Create New Task page includes a collapsible `Environment Variable Slots` sec
 - Filled slots can be renamed inline so you can keep meaningful labels for later reuse.
 - Filled slots can also be cleared without affecting the current workspace variables.
 - The number of slots comes from `ENVVAR_slot_count`, and the slot contents are written to `ENVVAR_slot_file` for cross-session persistence.
+
+### Web Terminal
+
+The `Terminal` button at the bottom of the sidebar opens a real PTY-backed shell on the ANT host. Each browser tab gets an independent login-shell process; closing the page or starting a new session terminates the previous shell and its process group.
+
+- Terminal input, output, and resize events use an origin-checked same-origin WebSocket, so HTTP uses `ws://` and HTTPS uses `wss://` automatically.
+- The font-size slider updates the terminal immediately and refits the PTY dimensions.
+- Cockpit, Graphite, Paper, and Solarized themes can be switched without reconnecting. Font size and theme are remembered per browser.
+- `New Session` closes the active shell and starts a clean one.
+
+The terminal runs with the same operating-system permissions as the ANT frontend process. ANT currently has no separate terminal authentication layer, so do not expose the web interface to untrusted networks. Set `TERMINAL_enabled` to `false` when shell access is not appropriate, and restart ANT after changing terminal settings.
 
 ### Test Run 
 Head over to the `Create New Task` tab and type the following in the `commands` box:

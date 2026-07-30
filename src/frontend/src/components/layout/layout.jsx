@@ -12,7 +12,7 @@ const SIDEBAR_THRESHOLD = 1200; // same as the JS logic
 
 export { useToast };
 
-export default function Layout({ children, pageTitle, pageActions }) {
+export default function Layout({ children, pageTitle, pageActions, compactHeader = false }) {
   const [messages, setMessages] = useState([]);
   const [sidebarPinned, setSidebarPinned] = useState(window.innerWidth > SIDEBAR_THRESHOLD);
 
@@ -47,8 +47,8 @@ export default function Layout({ children, pageTitle, pageActions }) {
       <div className={`g-sidenav-show bg-gray-200 ${sidebarPinned ? "g-sidenav-pinned" : "g-sidenav-hidden"}`}>
         <Sidebar pinned={sidebarPinned} />
         <main className="main-content position-relative border-radius-lg">
-          <div className="container-fluid bg-gray-200 app-shell" style={{ minHeight: "100vh" }}>
-            <Navbar pageTitle={pageTitle} toggleSidebar={toggleSidebar} actions={pageActions} />
+          <div className={`container-fluid bg-gray-200 app-shell ${compactHeader ? "app-shell-compact" : ""}`} style={{ minHeight: "100vh" }}>
+            <Navbar pageTitle={pageTitle} toggleSidebar={toggleSidebar} actions={pageActions} hideTitle={compactHeader} />
             {children}
           </div>
         </main>
