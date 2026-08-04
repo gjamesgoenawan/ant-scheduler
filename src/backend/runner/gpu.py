@@ -545,7 +545,7 @@ class gpu_runner(base_runner):
 
         self.try_dispatch_task()
 
-    def vis(self):
+    def vis(self, include_completed: bool = True):
         result = {}
 
         # task queue
@@ -575,16 +575,17 @@ class gpu_runner(base_runner):
         arg = dict(include_time=['start', 'runtime'],
                    formatted=True)
         
-        result['task_completed'] = []
-        for _k in self.task_completed:
-            d = _k.todict(**arg)
-            d['state'] = 'completed'
-            result['task_completed'].append(d)
+        if include_completed:
+            result['task_completed'] = []
+            for _k in self.task_completed:
+                d = _k.todict(**arg)
+                d['state'] = 'completed'
+                result['task_completed'].append(d)
 
         result['summary'] = {
             'queued': len(result['task_queue']),
             'running': len(result['task_ongoing']),
-            'completed': len(result['task_completed']),
+            'completed': len(self.task_completed),
         }
 
         result['visualizer'] = {

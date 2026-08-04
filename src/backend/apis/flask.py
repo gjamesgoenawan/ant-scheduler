@@ -25,6 +25,7 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 r = None
 runner_lock = threading.Lock()
 shutdown_started = False
+last_completed_signature = None
 
 def shutdown_runner(signum=None, frame=None):
     global shutdown_started
@@ -59,6 +60,36 @@ def safe_runner_call(func, *args, **kwargs):
         except Exception as e:
             traceback.print_exc()
             return jsonify({"status": "error", "message": str(e)}), 500
+
+def completed_signature(vis_data):
+    return tuple(
+        (
+            task.get("task_id"),
+            task.get("_stop_time"),
+            task.get("terminated"),
+        )
+        for task in vis_data.get("task_completed", [])
+    )
+
+def incremental_vis_data(vis_data):
+    incremental = dict(vis_data)
+    monitor = vis_data.get("monitor")
+    if isinstance(monitor, dict):
+        monitor_delta = dict(monitor)
+        history_size = len(monitor.get("cpu_usage", []))
+        for key in ("cpu_usage", "ram_usage"):
+            values = monitor.get(key)
+            if isinstance(values, list):
+                monitor_delta[key] = values[-1:]
+        for key in ("gpu_usage", "gpu_memory", "gpu_power_draw"):
+            series = monitor.get(key)
+            if isinstance(series, list):
+                monitor_delta[key] = [values[-1:] if isinstance(values, list) else values for values in series]
+        monitor_delta["_incremental"] = True
+        monitor_delta["_history_size"] = history_size
+        incremental["monitor"] = monitor_delta
+
+    return incremental
 
 # ---- API Endpoints ----
 @app.route("/", methods=["GET"])
@@ -119,7 +150,12 @@ def remove_task_from_history():
 
 @app.route("/vis", methods=["GET"])
 def vis():
-    return safe_runner_call(r.vis)
+    include_completed = str(request.args.get("include_completed", "true")).strip().lower() not in {"0", "false", "no", "off"}
+    return safe_runner_call(r.vis, include_completed)
+
+@app.route("/completed_tasks", methods=["GET"])
+def completed_tasks():
+    return safe_runner_call(lambda: r.vis(include_completed=True)["task_completed"])
 
 @app.route("/recovery_state", methods=["GET"])
 def recovery_state():
@@ -310,11 +346,19 @@ def clear_envar_slot():
 
 def emit_vis_data():
     """Emit /vis data every 1 second to all connected clients"""
+    global last_completed_signature
     while True:
         with runner_lock:
             r.step()
-            vis_data = r.vis()
-        socketio.emit("update_vis_data", vis_data)
+            signature = tuple(
+                (task.task_id, getattr(task, "_stop_time", None), task.terminated)
+                for task in r.task_completed
+            )
+            include_completed = signature != last_completed_signature
+            vis_data = r.vis(include_completed=include_completed)
+            if include_completed:
+                last_completed_signature = signature
+        socketio.emit("update_vis_data", incremental_vis_data(vis_data))
         socketio.sleep(r.opt["step_interval"])
 
 def run_api(runner, debug: bool = False):

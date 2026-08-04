@@ -42,7 +42,7 @@ export default function CreateTask() {
   const [createErrorMessage, setCreateErrorMessage] = useState("");
 
   useEffect(() => {
-    if (data?.task_completed && data.monitor?.gpu_name) {
+    if (data?.monitor?.gpu_name) {
       const gpuCount = data.monitor.gpu_name.length;
       setGpuOptions(Array.from({ length: gpuCount + 1 }, (_, i) => i));
       setQueuedTasks(data.task_queue || []);

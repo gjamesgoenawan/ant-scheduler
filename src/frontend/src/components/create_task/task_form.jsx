@@ -33,8 +33,8 @@ function TaskForm({
     setIsSubmitting(true);
 
     try {
-      // Flush the editor draft first so task creation always uses the latest env values.
-      const latestEnvar = envRef.current?.saveNow ? await envRef.current.saveNow() : envar;
+      // Task submission must not depend on a separate environment persistence request.
+      const latestEnvar = envRef.current?.getObject ? envRef.current.getObject() : envar;
       setEnvar(latestEnvar);
 
       const payload = {
