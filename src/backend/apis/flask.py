@@ -176,6 +176,16 @@ def delete_recovery_tasks():
     data = request.get_json(force=True)
     return safe_runner_call(r.delete_recovery_tasks, data)
 
+@app.route("/hide_recovery_tasks", methods=["POST"])
+def hide_recovery_tasks():
+    data = request.get_json(force=True)
+    return safe_runner_call(r.hide_recovery_tasks, data)
+
+@app.route("/hide_completed_tasks", methods=["POST"])
+def hide_completed_tasks():
+    data = request.get_json(force=True)
+    return safe_runner_call(r.hide_completed_tasks, data)
+
 @app.route("/toggle_allowed_gpu", methods=["POST"])
 def toggle_allowed_gpu():
     data = request.get_json(force=True)

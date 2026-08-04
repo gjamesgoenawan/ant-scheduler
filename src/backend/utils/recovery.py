@@ -61,7 +61,7 @@ class RecoveryStore:
         history = self.normalize_history(carried_history)
         sessions = [current_session] if _has_session_tasks(current_session) else []
         sessions.extend(history.get("sessions", []))
-        self.write_history({"version": 2, "sessions": sessions})
+        self.write_history({"version": 2, "sessions": sessions, "hidden": history.get("hidden", [])})
 
     def write_history(self, history: Dict[str, Any]) -> None:
         os.makedirs(os.path.dirname(self.path), exist_ok=True)
@@ -97,6 +97,7 @@ class RecoveryStore:
         return {
             "version": 2,
             "sessions": [],
+            "hidden": [],
         }
 
     @staticmethod
@@ -141,14 +142,24 @@ class RecoveryStore:
 
         sessions = [session for session in sessions if _has_session_tasks(session)]
         sessions.sort(key=lambda session: session.get("saved_at") or 0, reverse=True)
+        hidden = history.get("hidden", [])
+        if not isinstance(hidden, list):
+            hidden = []
+        hidden = [item for item in hidden if isinstance(item, dict) and _task_id(item)]
 
         return {
             "version": 2,
             "sessions": sessions,
+            "hidden": hidden,
         }
 
     @staticmethod
     def has_tasks(history: Dict[str, Any]) -> bool:
+        normalized = RecoveryStore.normalize_history(history)
+        return any(_has_session_tasks(session) for session in normalized.get("sessions", [])) or bool(normalized.get("hidden"))
+
+    @staticmethod
+    def has_session_tasks(history: Dict[str, Any]) -> bool:
         normalized = RecoveryStore.normalize_history(history)
         return any(_has_session_tasks(session) for session in normalized.get("sessions", []))
 
@@ -173,7 +184,7 @@ class RecoveryStore:
             session_id = str(entry.get("session_id", ""))
             section = str(entry.get("section", ""))
             task_id = str(entry.get("task_id", ""))
-            if session_id and section in {"ongoing", "queued", "completed"} and task_id:
+            if session_id and section in {"ongoing", "queued", "completed", "hidden"} and task_id:
                 normalized.append({
                     "session_id": session_id,
                     "section": section,
@@ -204,6 +215,20 @@ class RecoveryStore:
                             AntTask.from_state_dict(task_state),
                         ))
 
+        normalized = RecoveryStore.normalize_history(history)
+        for task_state in normalized.get("hidden", []):
+            task_id = _task_id(task_state)
+            if ("hidden", "hidden", task_id) in selected_entries:
+                selected_tasks.append((
+                    {
+                        "session_id": "hidden",
+                        "section": "hidden",
+                        "task_id": task_id,
+                        "hidden_from_section": task_state.get("_hidden_from_section", "completed"),
+                    },
+                    AntTask.from_state_dict(task_state),
+                ))
+
         return selected_tasks
 
     @staticmethod
@@ -232,7 +257,40 @@ class RecoveryStore:
             if _has_session_tasks(next_session):
                 remaining_sessions.append(next_session)
 
-        return RecoveryStore.normalize_history({"version": 2, "sessions": remaining_sessions})
+        remaining_hidden = [
+            task_state
+            for task_state in normalized_history.get("hidden", [])
+            if ("hidden", "hidden", _task_id(task_state)) not in selected_entries
+        ]
+        return RecoveryStore.normalize_history({
+            "version": 2,
+            "sessions": remaining_sessions,
+            "hidden": remaining_hidden,
+        })
+
+    @staticmethod
+    def add_hidden_tasks(history: Dict[str, Any], tasks: Iterable[AntTask]) -> Dict[str, Any]:
+        normalized = RecoveryStore.normalize_history(history)
+        hidden_by_id = {_task_id(task_state): task_state for task_state in normalized.get("hidden", [])}
+        for task in tasks:
+            task_state = task.to_state_dict()
+            task_state["_hidden_from_section"] = "completed"
+            hidden_by_id[task.task_id] = task_state
+        normalized["hidden"] = list(hidden_by_id.values())
+        return RecoveryStore.normalize_history(normalized)
+
+    @staticmethod
+    def hide_entries(history: Dict[str, Any], entries: List[Dict[str, Any]]) -> Dict[str, Any]:
+        selected = RecoveryStore.select_entries(history, entries)
+        next_history = RecoveryStore.remove_entries(history, [entry for entry, _task in selected])
+        normalized = RecoveryStore.normalize_history(next_history)
+        hidden_by_id = {_task_id(task_state): task_state for task_state in normalized.get("hidden", [])}
+        for entry, task in selected:
+            task_state = task.to_state_dict()
+            task_state["_hidden_from_section"] = entry["section"]
+            hidden_by_id[task.task_id] = task_state
+        normalized["hidden"] = list(hidden_by_id.values())
+        return RecoveryStore.normalize_history(normalized)
 
     @staticmethod
     def entries_from_legacy_selection(history: Dict[str, Any], section: str, task_ids: List[str]) -> List[Dict[str, str]]:

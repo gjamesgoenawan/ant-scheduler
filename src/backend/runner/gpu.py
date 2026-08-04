@@ -77,6 +77,9 @@ class gpu_runner(base_runner):
         return value
 
     def _has_pending_recovery(self):
+        return self.recovery_enabled and RecoveryStore.has_session_tasks(self.pending_recovery)
+
+    def _has_recovery_history(self):
         return self.recovery_enabled and RecoveryStore.has_tasks(self.pending_recovery)
 
     def persist_recovery_snapshot(self, force: bool = False):
@@ -86,7 +89,7 @@ class gpu_runner(base_runner):
             queued=self.loader.get_queue(),
             ongoing=self.task_ongoing.values(),
             completed=self.task_completed,
-            carried_history=self.pending_recovery if self._has_pending_recovery() else None,
+            carried_history=self.pending_recovery if self._has_recovery_history() else None,
         )
 
     @staticmethod
@@ -96,6 +99,8 @@ class gpu_runner(base_runner):
             status = "Terminated" if task.terminated else "Completed"
         elif section == "ongoing":
             status = "Interrupted"
+        elif section == "hidden":
+            status = "Hidden"
         else:
             status = "Queued"
 
@@ -106,6 +111,9 @@ class gpu_runner(base_runner):
             "task_id": task.task_id,
             "status": status,
             "start_time": task.get_time(type="start", formatted=True) or "-",
+            "start_timestamp": task.get_time(type="start", formatted=False),
+            "completed_time": task.get_time(type="stop", formatted=True) or "-",
+            "completed_timestamp": task.get_time(type="stop", formatted=False),
             "duration": task.get_time(type="runtime", formatted=True),
             "command": task.command,
             "n_gpus": getattr(task, "n_gpus", 0),
@@ -127,6 +135,7 @@ class gpu_runner(base_runner):
         history = RecoveryStore.normalize_history(self.pending_recovery)
         sessions = history.get("sessions", [])
         formatted_sessions = [self._format_recovery_session(session) for session in sessions]
+        hidden_tasks = [self._format_recovery_task(task, "hidden", "hidden") for task in history.get("hidden", [])]
         last_session = formatted_sessions[0] if formatted_sessions else None
         earlier_sessions = formatted_sessions[1:]
         has_pending = self._has_pending_recovery()
@@ -138,7 +147,8 @@ class gpu_runner(base_runner):
 
         return {
             "pending": should_prompt,
-            "has_history": has_pending,
+            "has_history": self._has_recovery_history(),
+            "hidden_tasks": hidden_tasks,
             "last_session": last_session,
             "earlier_sessions": earlier_sessions,
             "session_count": len(formatted_sessions),
@@ -165,7 +175,7 @@ class gpu_runner(base_runner):
         return legacy_entries
 
     def restore_recovery(self, data):
-        if not self._has_pending_recovery():
+        if not self._has_recovery_history():
             return {"status": "success", "message": "No pending recovery candidates.", "restored": {}}
 
         restored = {
@@ -181,13 +191,14 @@ class gpu_runner(base_runner):
         selected_entries = self._entries_from_recovery_request(data)
         for entry, task in RecoveryStore.select_entries(self.pending_recovery, selected_entries):
             section = entry["section"]
-            if section == "completed":
+            restore_source = entry.get("hidden_from_section", section)
+            if restore_source == "completed":
                 completed_tasks.append((entry, task))
                 continue
 
             task.reset()
             task.runner_envar.pop("CUDA_VISIBLE_DEVICES", None)
-            restore_section = "ongoing_to_queue" if section == "ongoing" else "queued"
+            restore_section = "ongoing_to_queue" if restore_source == "ongoing" else "queued"
             tasks_to_queue.append((entry, restore_section, task))
 
         self._recovery_persistence_suspended = True
@@ -228,6 +239,26 @@ class gpu_runner(base_runner):
             self.recovery_prompt_consumed = True
         self.persist_recovery_snapshot(force=True)
         return {"status": "success", "message": "Recovery tasks removed from history."}
+
+    def hide_recovery_tasks(self, data):
+        entries = self._entries_from_recovery_request(data)
+        if not entries:
+            return {"status": "success", "message": "No recovery tasks selected to hide."}
+        self.pending_recovery = RecoveryStore.hide_entries(self.pending_recovery, entries)
+        self.persist_recovery_snapshot(force=True)
+        return {"status": "success", "message": "Recovery tasks hidden."}
+
+    def hide_completed_tasks(self, data):
+        task_ids = {str(task_id) for task_id in (data or {}).get("task_ids", [])}
+        tasks = [task for task in self.task_completed if task.task_id in task_ids]
+        if not tasks:
+            return {"status": "success", "message": "No completed tasks selected to hide.", "hidden": []}
+
+        self.task_completed = [task for task in self.task_completed if task.task_id not in task_ids]
+        self.task_id_history.difference_update(task_ids)
+        self.pending_recovery = RecoveryStore.add_hidden_tasks(self.pending_recovery, tasks)
+        self.persist_recovery_snapshot(force=True)
+        return {"status": "success", "message": "Completed tasks hidden.", "hidden": [task.task_id for task in tasks]}
 
     def _ADGS_check(self) -> None:
         """
@@ -558,7 +589,7 @@ class gpu_runner(base_runner):
         # task ongoing, put into dicts and inject console_out from handler.
         handler_vis = self.handler.vis()
         result['task_ongoing'] = []
-        arg = dict(include_time=['start', 'runtime'],
+        arg = dict(include_time=['start', 'stop', 'runtime'],
                    formatted=True)
         for _k in self.task_ongoing.values():
             d = _k.todict(**arg)
@@ -572,13 +603,15 @@ class gpu_runner(base_runner):
             result['task_ongoing'].append(d)
         
         # task finished
-        arg = dict(include_time=['start', 'runtime'],
+        arg = dict(include_time=['start', 'stop', 'runtime'],
                    formatted=True)
         
         if include_completed:
             result['task_completed'] = []
             for _k in self.task_completed:
                 d = _k.todict(**arg)
+                d['time']['start_timestamp'] = _k.get_time(type='start', formatted=False)
+                d['time']['stop_timestamp'] = _k.get_time(type='stop', formatted=False)
                 d['state'] = 'completed'
                 result['task_completed'].append(d)
 

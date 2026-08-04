@@ -18516,6 +18516,45 @@ Icon colors
     background: #f8fafc;
   }
 
+  .task-recovery-search {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.7rem 1.2rem;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+    color: #64748b;
+  }
+
+  .task-recovery-search-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .task-recovery-search input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #0f172a;
+    font-size: 0.82rem;
+  }
+
+  .task-sort-select {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 0 2rem 0 0.7rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.65rem;
+    background-color: #fff;
+    color: #334155;
+    font-size: 0.75rem;
+    font-weight: 600;
+  }
+
   .task-recovery-tab {
     display: inline-flex;
     align-items: center;
@@ -18649,6 +18688,11 @@ Icon colors
   }
 
   .task-recovery-delete-button {
+    flex: 0 0 auto;
+    align-self: center;
+  }
+
+  .task-recovery-hide-button {
     flex: 0 0 auto;
     align-self: center;
   }
@@ -19229,8 +19273,8 @@ Icon colors
 
   .completed-task-toolbar-search {
     margin-left: auto;
-    flex: 0 0 260px;
-    max-width: 260px;
+    flex: 0 1 520px;
+    max-width: 520px;
   }
 
   .create-task-status-col {
@@ -20048,6 +20092,13 @@ Icon colors
     background: linear-gradient(90deg, #d97706 0%, #fbbf24 100%);
   }
 
+  .completed-task-filter-controls {
+    display: grid;
+    grid-template-columns: minmax(150px, 1fr) auto;
+    gap: 0.55rem;
+    width: 100%;
+  }
+
   .completed-task-search-shell {
     width: 100%;
     min-height: 36px;
@@ -20056,6 +20107,21 @@ Icon colors
     border-radius: 0.7rem;
     background: #fff;
     box-shadow: none;
+  }
+
+  @media (max-width: 575.98px) {
+    .task-recovery-search {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .task-sort-select {
+      width: 100%;
+    }
+
+    .completed-task-filter-controls {
+      grid-template-columns: 1fr;
+    }
   }
 
   .completed-task-search-icon {

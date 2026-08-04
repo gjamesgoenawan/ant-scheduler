@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import Layout, { useToast } from "../components/layout/layout";
 import LineCountControl from "../components/line_count_control";
-import { useMonitorData } from "../App";
+import { API_URL, useMonitorData } from "../App";
 import {
   bulkDeleteTasks,
   bulkDownloadLogs,
@@ -21,6 +21,9 @@ import {
 import { fetchLogContent } from "../utils/logFetch";
 import { clampLineCount, takeLastLinesFromText } from "../utils/lineCount";
 import { buildOutputWindowStyle, getOutputWindowLines } from "../utils/outputWindow";
+import { fetchWithTimeout } from "../utils/fetchWithTimeout";
+import { taskMatchesSearch } from "../utils/taskSearch";
+import { sortTasks, TASK_SORT_OPTIONS } from "../utils/taskSort";
 
 const COMPLETED_DETAIL_STORAGE_KEY = "antScheduler.completedTasks.detailExpanded";
 const COMPLETED_OUTPUT_STORAGE_KEY = "antScheduler.completedTasks.outputExpanded";
@@ -41,6 +44,7 @@ const TaskRow = ({
   onCopy,
   onRestart,
   onDelete,
+  onHide,
   onDownload,
   outputLineCount,
   outputFetchLineCount,
@@ -252,6 +256,14 @@ const TaskRow = ({
             </button>
 
             <button
+              className="btn btn-link text-secondary p-2 mb-0"
+              title="Hide Task"
+              onClick={() => onHide(task)}
+            >
+              <i className="material-icons text-lg">visibility_off</i>
+            </button>
+
+            <button
               className="btn btn-link text-danger p-2 mb-0"
               title="Delete Task"
               onClick={() => onDelete(task)}
@@ -358,6 +370,7 @@ export default function CompletedTasks() {
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortMode, setSortMode] = useState("completed-desc");
   const [detailExpandedByTaskId, setDetailExpandedByTaskId] = useState(() =>
     readBooleanMap(COMPLETED_DETAIL_STORAGE_KEY)
   );
@@ -486,9 +499,39 @@ export default function CompletedTasks() {
     await bulkDeleteTasks(selectedTaskIds, addToast);
   };
 
-  const normalizedSearchQuery = searchQuery.toLowerCase();
-  const filteredTasks = completedTasks.filter((task) =>
-    task.task_id.toLowerCase().includes(normalizedSearchQuery)
+  const handleHideTask = async (task) => {
+    try {
+      const response = await fetchWithTimeout(`${API_URL}/hide_completed_tasks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ task_ids: [task.task_id] }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload?.message || `Hide Task failed with status ${response.status}`);
+      }
+      setCompletedTasks((current) => current.filter((item) => item.task_id !== task.task_id));
+      addToast({
+        type: "info",
+        title: "Task Hidden",
+        message: `${task.task_id} moved to Restore Tasks`,
+        autohide: true,
+        delay: 2200,
+      });
+    } catch (hideError) {
+      addToast({
+        type: "error",
+        title: "Hide Failed",
+        message: String(hideError.message || hideError),
+        autohide: true,
+        delay: 3000,
+      });
+    }
+  };
+
+  const filteredTasks = sortTasks(
+    completedTasks.filter((task) => taskMatchesSearch(task, searchQuery)),
+    sortMode
   );
   const allDetailsExpanded =
     completedTasks.length > 0 && completedTasks.every((task) => isTaskExpanded(task));
@@ -649,15 +692,27 @@ export default function CompletedTasks() {
                 </div>
 
                 <div className="completed-task-toolbar-search">
-                  <div className="completed-task-search-shell d-flex align-items-center">
-                    <i className="material-icons completed-task-search-icon">search</i>
-                    <input
-                      type="text"
-                      className="completed-task-search-input"
-                      placeholder="Search tasks"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
+                  <div className="completed-task-filter-controls">
+                    <div className="completed-task-search-shell d-flex align-items-center">
+                      <i className="material-icons completed-task-search-icon">search</i>
+                      <input
+                        type="text"
+                        className="completed-task-search-input"
+                        placeholder="Search tasks"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    <select
+                      className="task-sort-select"
+                      value={sortMode}
+                      onChange={(event) => setSortMode(event.target.value)}
+                      aria-label="Sort completed tasks"
+                    >
+                      {TASK_SORT_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
@@ -674,7 +729,7 @@ export default function CompletedTasks() {
               {filteredTasks.length === 0 ? (
                   <div className="text-center py-4 text-muted">No completed tasks found.</div>
               ) : (
-                  filteredTasks.toReversed().map((task, idx) => (
+                  filteredTasks.map((task, idx) => (
                   <TaskRow 
                       key={task.task_id} 
                       task={task} 
@@ -689,6 +744,7 @@ export default function CompletedTasks() {
                       onCopy={(task) => copyCommand(task, addToast)}
                       onRestart={(task) => restartTask(task.task_id, addToast)}
                       onDownload={(task) => downloadLog(task.task_id, addToast)}
+                      onHide={handleHideTask}
                       onDelete={(task) => deleteTask(task.task_id, addToast)}
                           outputLineCount={effectiveOutputLineCount}
                         outputFetchLineCount={outputFetchLineCount}

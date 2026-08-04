@@ -627,8 +627,20 @@ export default function Home() {
   );
   const gpuFleetSummary = formatGpuFleetSummary(monitor?.gpu_name || []);
 
+  const pageActions = (
+    <button
+      type="button"
+      className="btn btn-outline-dark page-action-btn mb-0 d-flex align-items-center gap-1"
+      onClick={() => window.dispatchEvent(new CustomEvent("ant:open-recovery"))}
+      title="Restore Tasks"
+    >
+      <i className="material-icons" style={{ fontSize: "16px" }}>restore</i>
+      <span className="text-xxs text-uppercase font-weight-bolder">Restore Tasks</span>
+    </button>
+  );
+
   return (
-    <Layout pageTitle="Dashboard">
+    <Layout pageTitle="Dashboard" pageActions={pageActions}>
       <div className="container-fluid py-2 dashboard-page">
         {isMobileView ? (
           <div className="dashboard-mobile-shell">
