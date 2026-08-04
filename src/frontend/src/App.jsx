@@ -30,7 +30,12 @@ export const SOCKETIO_URL = '/';
 
 
 const socket = io(SOCKETIO_URL, {
-  transports: ["websocket"],
+  transports: ["polling", "websocket"],
+  upgrade: true,
+  timeout: 8000,
+  reconnection: true,
+  reconnectionDelay: 500,
+  reconnectionDelayMax: 5000,
 });
 
 function App() {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 
 import { API_URL } from "../../App";
+import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 
 function GpuToggleList({ data }) {
   const [enabled, setEnabled] = useState(() => data?.monitor?.gpu_allowed ?? []);
@@ -20,7 +21,7 @@ function GpuToggleList({ data }) {
     );
 
     try {
-      await fetch(`${API_URL}/toggle_allowed_gpu`, {
+      await fetchWithTimeout(`${API_URL}/toggle_allowed_gpu`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ gpu_indices: [i], allowed: newAllowed }),

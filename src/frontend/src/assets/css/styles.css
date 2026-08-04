@@ -19192,7 +19192,7 @@ Icon colors
   .terminal-stage {
     flex: 1 1 auto;
     min-height: 0;
-    padding: 0.75rem;
+    padding: 0.75rem 0.4rem 0.4rem 0.75rem;
     transition: background-color 0.15s ease;
   }
 
@@ -20475,7 +20475,7 @@ Icon colors
     }
 
     .terminal-stage {
-      padding: 0.55rem;
+      padding: 0.55rem 0.3rem 0.3rem 0.55rem;
     }
 
     .terminal-host {

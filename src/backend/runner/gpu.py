@@ -46,6 +46,7 @@ class gpu_runner(base_runner):
         loaded_recovery = self.recovery_store.load() if self.recovery_enabled else RecoveryStore.empty_history()
         self.pending_recovery = loaded_recovery if RecoveryStore.has_tasks(loaded_recovery) else RecoveryStore.empty_history()
         self.recovery_prompt_consumed = False
+        self._recovery_persistence_suspended = False
 
         # Initialize GPU monitoring
         self.monitor = ThreadedMonitor(opt)
@@ -79,7 +80,7 @@ class gpu_runner(base_runner):
         return self.recovery_enabled and RecoveryStore.has_tasks(self.pending_recovery)
 
     def persist_recovery_snapshot(self, force: bool = False):
-        if not self.recovery_enabled:
+        if not self.recovery_enabled or (self._recovery_persistence_suspended and not force):
             return
         self.recovery_store.write(
             queued=self.loader.get_queue(),
@@ -189,27 +190,31 @@ class gpu_runner(base_runner):
             restore_section = "ongoing_to_queue" if section == "ongoing" else "queued"
             tasks_to_queue.append((entry, restore_section, task))
 
-        for entry, section, task in tasks_to_queue:
-            ok, message = self.add_task_to_queue(task, allow_partial=True)
-            if ok:
-                restored[section].append(task.task_id)
+        self._recovery_persistence_suspended = True
+        try:
+            for entry, section, task in tasks_to_queue:
+                ok, message = self.add_task_to_queue(task, allow_partial=True)
+                if ok:
+                    restored[section].append(task.task_id)
+                    entries_to_remove.append(entry)
+                else:
+                    restored["failed"].append({"task_id": task.task_id, "message": message})
+
+            for entry, task in completed_tasks:
+                if task.task_id in self.task_ongoing or task.task_id in [_t.task_id for _t in self.loader.get_queue()]:
+                    restored["failed"].append({
+                        "task_id": task.task_id,
+                        "message": "A running or queued task already uses this task id.",
+                    })
+                    continue
+                self.add_task_to_history(task)
+                restored["completed"].append(task.task_id)
                 entries_to_remove.append(entry)
-            else:
-                restored["failed"].append({"task_id": task.task_id, "message": message})
 
-        for entry, task in completed_tasks:
-            if task.task_id in self.task_ongoing or task.task_id in [_t.task_id for _t in self.loader.get_queue()]:
-                restored["failed"].append({
-                    "task_id": task.task_id,
-                    "message": "A running or queued task already uses this task id.",
-                })
-                continue
-            self.add_task_to_history(task)
-            restored["completed"].append(task.task_id)
-            entries_to_remove.append(entry)
-
-        self.pending_recovery = RecoveryStore.remove_entries(self.pending_recovery, entries_to_remove)
-        self.recovery_prompt_consumed = True
+            self.pending_recovery = RecoveryStore.remove_entries(self.pending_recovery, entries_to_remove)
+            self.recovery_prompt_consumed = True
+        finally:
+            self._recovery_persistence_suspended = False
         self.persist_recovery_snapshot(force=True)
         return {"status": "success", "message": "Recovery applied.", "restored": restored}
 

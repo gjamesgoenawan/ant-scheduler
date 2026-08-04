@@ -2,13 +2,14 @@ import React from "react";
 import illustration from "/img/chill_2.png";
 import { API_URL } from "../../App";
 import { useToast } from "../layout/layout";
+import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 
 export default function QueuedTaskList({ queuedTasks }) {
   const { addToast } = useToast();
 
   const runQueueAction = async ({ taskId, endpoint, successTitle, errorTitle }) => {
     try {
-      const response = await fetch(`${API_URL}/${endpoint}`, {
+      const response = await fetchWithTimeout(`${API_URL}/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ task_ids: taskId }),

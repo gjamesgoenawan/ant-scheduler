@@ -1,4 +1,5 @@
 import { API_URL } from "../App";
+import { fetchWithTimeout } from "./fetchWithTimeout";
 
 // build command
 export const buildAntCommand = (task) => {
@@ -28,7 +29,7 @@ export const copyCommand = async (task, addToast) => {
 };
 
 const fetchJsonOrThrow = async (url, options = {}) => {
-  const res = await fetch(url, options);
+  const res = await fetchWithTimeout(url, options);
 
   let parsed = null;
   try {
@@ -46,7 +47,7 @@ const fetchJsonOrThrow = async (url, options = {}) => {
 // download log
 export const downloadLog = async (taskId, addToast) => {
   try {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${API_URL}/get_log_file?task_id=${taskId}`,
       { method: "GET" }
     );
@@ -84,7 +85,7 @@ export const deleteTask = async (taskId, addToast) => {
   if (!window.confirm(`Delete task ${taskId}?`)) return;
 
   try {
-    const res = await fetch(`${API_URL}/remove_task_from_history`, {
+    const res = await fetchWithTimeout(`${API_URL}/remove_task_from_history`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ task_ids: taskId }),
@@ -147,7 +148,7 @@ export const terminateTask = async (taskId, addToast) => {
   if (!window.confirm(`Are you sure you want to terminate task ${taskId}?`)) return;
 
   try {
-    const res = await fetch(`${API_URL}/kill_task`, {
+    const res = await fetchWithTimeout(`${API_URL}/kill_task`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ task_ids: taskId }),
@@ -245,7 +246,7 @@ export const bulkDownloadLogs = async (taskIds, addToast) => {
 
   for (const taskId of taskIds) {
     try {
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `${API_URL}/get_log_file?task_id=${taskId}`,
         { method: "GET" }
       );

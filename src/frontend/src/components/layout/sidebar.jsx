@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 import logo from "/img/logo-ct.png"; // Copy your logo here
+import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 
 export default function Sidebar({ pinned }) {
   const [terminalEnabled, setTerminalEnabled] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/terminal/config")
+    fetchWithTimeout("/terminal/config")
       .then((response) => {
         if (!response.ok) throw new Error(`Terminal config returned ${response.status}`);
         return response.json();

@@ -1,4 +1,5 @@
 import { API_URL } from "../App";
+import { fetchWithTimeout } from "./fetchWithTimeout";
 
 function parseLogResponseBody(rawText) {
   const trimmed = rawText.trim();
@@ -24,7 +25,7 @@ export async function fetchLogContent(taskId, options = {}) {
     params.set("tail_lines", String(options.tailLines));
   }
 
-  const response = await fetch(`${API_URL}/get_log?${params.toString()}`);
+  const response = await fetchWithTimeout(`${API_URL}/get_log?${params.toString()}`);
   const rawText = await response.text();
   const payload = parseLogResponseBody(rawText);
 

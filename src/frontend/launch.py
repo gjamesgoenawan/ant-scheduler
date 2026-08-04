@@ -25,13 +25,22 @@ logging.basicConfig(level=logging.ERROR)
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "./dist/")
 app = Quart(__name__, static_folder=STATIC_DIR, static_url_path="")
 
+@app.after_request
+async def add_static_cache_headers(response):
+    if request.path.startswith("/assets/"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif response.content_type and "text/html" in response.content_type:
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
 @app.route("/api/", defaults={'path': ''}, methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 @app.route("/api/<path:path>", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy(path):
     if request.headers.get("upgrade", "").lower() == "websocket":
         return Response("Upgrade handled on /socket.io/", status=426)
 
-    async with httpx.AsyncClient() as client:
+    timeout = httpx.Timeout(connect=5.0, read=30.0, write=30.0, pool=5.0)
+    async with httpx.AsyncClient(timeout=timeout) as client:
         forward_headers = {
             k: v
             for k, v in request.headers.items()
@@ -40,13 +49,20 @@ async def proxy(path):
         # Force identity encoding so the proxy never forwards compressed log bytes as plain text.
         forward_headers["accept-encoding"] = "identity"
         backend_url = f"{BACKEND_URL}/{path}"
-        resp = await client.request(
-            request.method,
-            backend_url,
-            headers=forward_headers,
-            content=await request.get_data(),
-            params=request.args
-        )
+        try:
+            resp = await client.request(
+                request.method,
+                backend_url,
+                headers=forward_headers,
+                content=await request.get_data(),
+                params=request.args
+            )
+        except httpx.TimeoutException:
+            logger.warning("Backend request timed out: %s %s", request.method, backend_url)
+            return {"status": "error", "message": "Backend request timed out. Please retry."}, 504
+        except httpx.RequestError as error:
+            logger.warning("Backend request failed: %s %s (%s)", request.method, backend_url, error)
+            return {"status": "error", "message": "Backend is temporarily unavailable."}, 502
 
         excluded_headers = {
             "content-encoding", "transfer-encoding", "connection",
@@ -61,6 +77,47 @@ async def proxy(path):
             headers=headers,
             content_type=resp.headers.get("content-type", "application/json")
         )
+
+@app.route("/socket.io/", methods=["GET", "POST", "OPTIONS"])
+async def socketio_http_proxy():
+    timeout = httpx.Timeout(connect=5.0, read=30.0, write=30.0, pool=5.0)
+    forward_headers = {
+        key: value
+        for key, value in request.headers.items()
+        if key.lower() not in {"host", "accept-encoding", "content-length"}
+    }
+    forward_headers["accept-encoding"] = "identity"
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.request(
+                request.method,
+                f"{BACKEND_URL}/socket.io/",
+                headers=forward_headers,
+                content=await request.get_data(),
+                params=request.args,
+            )
+    except httpx.TimeoutException:
+        return Response("Socket.IO backend timed out", status=504, content_type="text/plain")
+    except httpx.RequestError as error:
+        logger.warning("Socket.IO HTTP proxy failed: %s", error)
+        return Response("Socket.IO backend unavailable", status=502, content_type="text/plain")
+
+    excluded_headers = {
+        "content-encoding", "transfer-encoding", "connection", "content-length",
+        "keep-alive", "proxy-authenticate", "proxy-authorization", "te", "trailer", "upgrade",
+    }
+    headers = {
+        key: value
+        for key, value in response.headers.items()
+        if key.lower() not in excluded_headers
+    }
+    return Response(
+        response.content,
+        status=response.status_code,
+        headers=headers,
+        content_type=response.headers.get("content-type", "text/plain"),
+    )
 
 async def _forward_ws(client_ws, backend_ws):
     async def client_to_backend():

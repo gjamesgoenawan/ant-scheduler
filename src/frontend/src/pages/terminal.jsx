@@ -172,6 +172,30 @@ export default function TerminalPage({ active }) {
     const socket = new WebSocket(terminalWebSocketUrl());
     socket.binaryType = "arraybuffer";
     socketRef.current = socket;
+    const sendTerminalInput = (data) => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: "input", data }));
+      }
+    };
+    terminal.attachCustomKeyEventHandler((event) => {
+      const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+      if (!isMac) return true;
+
+      let data = null;
+      if (event.metaKey && !event.altKey && !event.ctrlKey) {
+        if (event.key === "ArrowLeft") data = "\x01";
+        if (event.key === "ArrowRight") data = "\x05";
+        if (event.key === "Backspace") data = "\x15";
+      } else if (event.altKey && !event.metaKey && !event.ctrlKey) {
+        if (event.key === "Backspace") data = "\x17";
+        if (event.key === "Delete") data = "\x1b[3;5~";
+      }
+
+      if (data === null) return true;
+      event.preventDefault();
+      if (event.type === "keydown") sendTerminalInput(data);
+      return false;
+    });
     const heartbeatTimer = window.setInterval(() => {
       if (socket.readyState === WebSocket.OPEN) {
         socket.send(JSON.stringify({ type: "heartbeat" }));
@@ -218,9 +242,7 @@ export default function TerminalPage({ active }) {
     socket.addEventListener("error", () => setConnectionState("error"));
 
     const inputDisposable = terminal.onData((data) => {
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: "input", data }));
-      }
+      sendTerminalInput(data);
     });
     const forceAltSelection = (event) => {
       if (!event.altKey || event.shiftKey || event.button !== 0) return;

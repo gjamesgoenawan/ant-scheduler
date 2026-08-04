@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import EnvVarEditor from "./envar_editor";
 import { API_URL } from "../../App";
 import { useToast } from "../layout/layout";
+import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 
 function TaskForm({
   queueMode,
@@ -44,7 +45,7 @@ function TaskForm({
         envar: latestEnvar,
       };
 
-      const response = await fetch(`${API_URL}/create_task`, {
+      const response = await fetchWithTimeout(`${API_URL}/create_task`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

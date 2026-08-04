@@ -12,6 +12,7 @@ import {
   readStoredBoolean,
   writeStoredValue,
 } from "../../utils/persistedTaskState";
+import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 
 const ENV_VAR_PRESETS = [
   { key: "ant_task_id", value: '"[uuid]"', label: "ant_task_id", defaultLabel: "[uuid]" },
@@ -144,7 +145,7 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
   };
 
   const requestSlotState = async (path, body = null) => {
-    const response = await fetch(`${API_URL}${path}`, {
+    const response = await fetchWithTimeout(`${API_URL}${path}`, {
       method: body ? "POST" : "GET",
       headers: body ? { "Content-Type": "application/json" } : undefined,
       body: body ? JSON.stringify(body) : undefined,
@@ -161,7 +162,7 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${API_URL}/get_envar`);
+        const res = await fetchWithTimeout(`${API_URL}/get_envar`);
         if (!res.ok) return;
         const data = await res.json();
         const loaded = objectToRows(data || {});
@@ -282,7 +283,7 @@ const EnvVarEditor = forwardRef(function EnvVarEditor({ onSave, onLoad }, ref) {
       .catch(() => {})
       .then(async () => {
         try {
-          const r = await fetch(`${API_URL}/save_envar`, {
+          const r = await fetchWithTimeout(`${API_URL}/save_envar`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ envar: payload }),

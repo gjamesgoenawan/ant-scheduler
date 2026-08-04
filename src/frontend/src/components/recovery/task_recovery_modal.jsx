@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { API_URL } from "../../App";
 import { useToast } from "../layout/layout";
+import { fetchWithTimeout } from "../../utils/fetchWithTimeout";
 
 const SECTION_LABELS = {
   ongoing: "Interrupted Ongoing Tasks",
@@ -44,6 +45,11 @@ function normalizeRecoveryPayload(payload) {
     },
     earlier_sessions: [],
   };
+}
+
+async function recoveryResponseError(response) {
+  const payload = await response.json().catch(() => null);
+  return new Error(payload?.message || `Recovery request failed with status ${response.status}`);
 }
 
 function taskKey(task) {
@@ -169,9 +175,9 @@ export default function TaskRecoveryModal() {
   const [error, setError] = useState(null);
 
   const loadRecoveryState = async ({ consumePrompt = false } = {}) => {
-    const response = await fetch(`${API_URL}/recovery_state?consume_prompt=${consumePrompt ? "true" : "false"}`);
+    const response = await fetchWithTimeout(`${API_URL}/recovery_state?consume_prompt=${consumePrompt ? "true" : "false"}`);
     if (!response.ok) {
-      throw new Error(await response.text());
+      throw await recoveryResponseError(response);
     }
     const payload = await response.json();
     return normalizeRecoveryPayload(payload?.data || payload);
@@ -257,7 +263,8 @@ export default function TaskRecoveryModal() {
   const closeRecovery = async () => {
     setSubmitting(true);
     try {
-      await fetch(`${API_URL}/dismiss_recovery`, { method: "POST" });
+      const response = await fetchWithTimeout(`${API_URL}/dismiss_recovery`, { method: "POST" });
+      if (!response.ok) throw await recoveryResponseError(response);
       setRecovery(null);
       addToast({ type: "info", title: "Recovery kept for later", delay: 2000 });
     } catch (dismissError) {
@@ -271,12 +278,12 @@ export default function TaskRecoveryModal() {
     const key = taskKey(task);
     setDeletingKey(key);
     try {
-      const response = await fetch(`${API_URL}/delete_recovery_tasks`, {
+      const response = await fetchWithTimeout(`${API_URL}/delete_recovery_tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ entries: [taskEntry(task)] }),
       });
-      if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) throw await recoveryResponseError(response);
       setSelectedKeys((current) => current.filter((selectedKey) => selectedKey !== key));
       const nextRecovery = await loadRecoveryState({ consumePrompt: false });
       setRecovery(nextRecovery);
@@ -291,12 +298,12 @@ export default function TaskRecoveryModal() {
   const restoreRecovery = async () => {
     setSubmitting(true);
     try {
-      const response = await fetch(`${API_URL}/restore_recovery`, {
+      const response = await fetchWithTimeout(`${API_URL}/restore_recovery`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ entries: selectedEntries }),
       });
-      if (!response.ok) throw new Error(await response.text());
+      if (!response.ok) throw await recoveryResponseError(response);
       setRecovery(null);
       addToast({ type: "success", title: "Tasks restored", delay: 2200 });
     } catch (restoreError) {
